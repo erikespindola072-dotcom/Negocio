@@ -1,6 +1,8 @@
 'use strict';
 /* TruckBook — inventory, purchases, sales & expenses for a food truck.
-   All data is stored in this browser (localStorage). Use More → Data to back up. */
+   Standalone (index.html / GitHub Pages): data lives in this browser (localStorage + IndexedDB for photos).
+   As a claude.ai Artifact: data syncs to the artifact's database, photos go to its asset store,
+   and files are offered through the downloads capability. Same code, detected at runtime. */
 
 // ---------- Constants ----------
 const STORE_KEY = 'truckbook.v1';
@@ -63,9 +65,182 @@ function load() {
   return emptyState();
 }
 let S = load();
+function saveLocal() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); return true; } catch { return false; }
+}
 function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
-  catch (e) { toast('⚠️ Could not save — storage full?'); }
+  const ok = saveLocal();
+  if (Sync.on) {
+    if (Sync.readonly) return toast('View only — your changes are not saved');
+    localDirty(true); scheduleSync();
+  } else if (!ok && !IS_ARTIFACT) toast('⚠️ Could not save — storage full?');
+}
+
+// ---------- Platform (claude.ai Artifact) ----------
+const IS_ARTIFACT = !!(window.claude && typeof window.claude.use === 'function');
+const capCache = {};
+const cap = name => IS_ARTIFACT ? (capCache[name] ||= Promise.resolve().then(() => window.claude.use(name)).catch(() => null)) : Promise.resolve(null);
+const Platform = { db: null, assets: null, user: null, booting: IS_ARTIFACT };
+
+// Cloud layout: one "truck/core" doc (settings, items, menu…) + one "months/YYYY-MM" doc per month of history.
+// Keeps every document far below the 256 KiB limit for years of use.
+const LOG_KEYS = ['prices', 'purchases', 'expenses', 'sales', 'waste'];
+const CORE_KEYS = ['version', 'settings', 'products', 'menu', 'suppliers', 'locations', 'recurring', 'sample'];
+function stable(v) {
+  if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).filter(k => v[k] !== undefined).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+  return JSON.stringify(v ?? null);
+}
+function partition(st) {
+  const docs = { 'truck/core': Object.fromEntries(CORE_KEYS.map(k => [k, st[k] ?? null])) };
+  LOG_KEYS.forEach(k => (st[k] || []).forEach(r => {
+    const id = 'months/' + (/^\d{4}-\d{2}/.test(r.date || '') ? r.date.slice(0, 7) : '0000-00');
+    (docs[id] ||= Object.fromEntries(LOG_KEYS.map(x => [x, []])))[k].push(r);
+  }));
+  return docs;
+}
+function unpartition(docs) {
+  const core = docs['truck/core'] || {};
+  const st = Object.assign(emptyState(), core);
+  st.settings = Object.assign(emptyState().settings, core.settings);
+  CORE_KEYS.forEach(k => { if (st[k] == null && k !== 'sample') st[k] = emptyState()[k]; });
+  LOG_KEYS.forEach(k => st[k] = []);
+  Object.keys(docs).filter(k => k.startsWith('months/')).sort().forEach(k => LOG_KEYS.forEach(x => (docs[k][x] || []).forEach(r => st[x].push(r))));
+  return st;
+}
+
+const Sync = { on: false, ready: false, readonly: false, status: IS_ARTIFACT ? 'connecting' : 'none', written: {},
+  remote: { core: undefined, months: {} }, fresh: { core: false, months: false }, timer: null, pending: false, busy: false, again: false, deferRender: false };
+function localDirty(v) { try { v ? localStorage.setItem('truckbook.dirty', '1') : localStorage.removeItem('truckbook.dirty'); } catch { } }
+function isLocalDirty() { try { return localStorage.getItem('truckbook.dirty') === '1'; } catch { return false; } }
+const STATUS = {
+  none: ['', ''], connecting: ['Connecting…', ''], saving: ['Saving…', ''], saved: ['Saved', 'ok'],
+  offline: ['Offline · kept on this device', 'warn'], readonly: ['View only', 'warn'], full: ['Storage full', 'bad'],
+  error: ['Not saved', 'bad'], local: ['On this device only', 'warn'],
+};
+function setStatus(st) { Sync.status = st; renderStatus(); }
+function renderStatus() {
+  const el = document.getElementById('syncPill'); if (!el) return;
+  const [label, cls] = STATUS[Sync.status] || STATUS.none;
+  el.textContent = label; el.className = 'sync ' + cls; el.hidden = !label;
+}
+function scheduleSync() {
+  if (!Sync.on || !Sync.ready || Sync.readonly) return;
+  clearTimeout(Sync.timer); Sync.pending = true; setStatus('saving');
+  Sync.timer = setTimeout(flush, 600);
+}
+async function writeDoc(key, body) {
+  const ref = Platform.db.doc(key);
+  const run = () => body ? ref.set(body) : ref.delete();
+  try { await run(); }
+  catch (e) {
+    if (!e || e.code === 'unavailable' || e.code === 'resource_exhausted') { await new Promise(r => setTimeout(r, 800 + Math.random() * 1200)); await run(); }
+    else throw e;
+  }
+}
+async function flush() {
+  if (Sync.busy) { Sync.again = true; return; }
+  Sync.busy = true; Sync.pending = false;
+  try {
+    const docs = partition(S);
+    for (const k of new Set([...Object.keys(docs), ...Object.keys(Sync.written)])) {
+      const str = docs[k] ? stable(docs[k]) : null;
+      if (str === (Sync.written[k] ?? null)) continue;
+      await writeDoc(k, docs[k]);
+      if (str) Sync.written[k] = str; else delete Sync.written[k];
+    }
+    localDirty(false); setStatus('saved');
+  } catch (e) {
+    const code = e && e.code;
+    if (code === 'quota_exceeded') { setStatus('full'); toast('Storage is full — delete old photos or records'); }
+    else if (code === 'invalid_argument' || code === 'not_granted' || code === 'revoked') { setStatus('error'); toast('Couldn’t save to your account. Changes are kept on this device.'); }
+    else { setStatus('offline'); clearTimeout(Sync.timer); Sync.pending = true; Sync.timer = setTimeout(flush, 15000); }
+  } finally {
+    Sync.busy = false;
+    if (Sync.again) { Sync.again = false; flush(); }
+  }
+}
+function remoteDocs() {
+  const docs = {};
+  if (Sync.remote.core) docs['truck/core'] = Sync.remote.core;
+  Object.entries(Sync.remote.months).forEach(([id, d]) => docs['months/' + id] = d);
+  return docs;
+}
+function adoptRemote(docs, strs) {
+  S = unpartition(JSON.parse(JSON.stringify(docs)));
+  Sync.written = strs; saveLocal(); setStatus(Sync.readonly ? 'readonly' : 'saved');
+  safeRender();
+}
+function onRemote() {
+  if (!(Sync.fresh.core && Sync.fresh.months)) return;
+  const docs = remoteDocs();
+  const strs = Object.fromEntries(Object.entries(docs).map(([k, v]) => [k, stable(v)]));
+  if (!Sync.ready) {
+    Sync.ready = true; Platform.booting = false; clearTimeout(Sync.loadTimer);
+    if (Sync.readonly || (docs['truck/core'] && !isLocalDirty())) adoptRemote(docs, strs);
+    else {
+      // Nothing in the cloud yet, or offline edits waiting: this device's copy wins.
+      Sync.written = strs;
+      if (!isEmpty() || Object.keys(strs).length) flush(); else setStatus('saved');
+      safeRender();
+    }
+    if (!Sync.readonly && runRecurring()) safeRender();
+    return;
+  }
+  if (Sync.busy || Sync.pending) return; // our own newer edits are on their way
+  const keys = new Set([...Object.keys(strs), ...Object.keys(Sync.written)]);
+  if ([...keys].some(k => strs[k] !== Sync.written[k])) adoptRemote(docs, strs);
+}
+// Don't wipe a half-typed form when another device saves.
+function safeRender() {
+  const a = document.activeElement;
+  if (a && a.closest && a.closest('#view') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) { Sync.deferRender = true; return; }
+  render();
+}
+document.addEventListener('focusout', () => setTimeout(() => {
+  if (Sync.deferRender && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#view input, #view select, #view textarea'))) { Sync.deferRender = false; render(); }
+}, 0));
+
+async function initPlatform() {
+  if (!IS_ARTIFACT) return;
+  renderStatus();
+  const [db, user, assets] = await Promise.all([cap('db'), cap('user'), cap('assets')]);
+  Object.assign(Platform, { db, user, assets });
+  if (!db) { Platform.booting = false; setStatus('local'); runRecurring(); render(); return; }
+  Sync.on = true;
+  try { if (user && (await user.canEdit()) === false) Sync.readonly = true; } catch { }
+  Sync.loadTimer = setTimeout(() => {
+    if (!Sync.ready) { Platform.booting = false; setStatus('offline'); render(); }
+  }, 10000);
+  const fail = e => { if (!Sync.ready) { Platform.booting = false; setStatus('offline'); render(); } else setStatus('offline'); };
+  db.doc('truck/core').onSnapshot(snap => {
+    if (snap.metadata.hasPendingWrites) return;
+    Sync.remote.core = snap.exists ? snap.data() : null;
+    if (!snap.metadata.fromCache) Sync.fresh.core = true;
+    onRemote();
+  }, fail);
+  db.collection('months').onSnapshot(qs => {
+    if (qs.metadata.hasPendingWrites) return;
+    const m = {}; qs.docs.forEach(d => { if (d.exists) m[d.id] = d.data(); });
+    Sync.remote.months = m;
+    if (!qs.metadata.fromCache) Sync.fresh.months = true;
+    onRemote();
+  }, fail);
+  render(); // photo controls depend on the asset store
+}
+
+// In-page confirmation (artifact viewers ignore window.confirm).
+function ask(message, okLabel = 'Delete', danger = true) {
+  return new Promise(resolve => {
+    const d = document.getElementById('ask');
+    document.getElementById('askMsg').textContent = message;
+    const ok = document.getElementById('askOk'), no = document.getElementById('askCancel');
+    ok.textContent = okLabel; ok.className = 'btn ' + (danger ? 'danger' : 'primary');
+    const done = v => { ok.onclick = no.onclick = null; d.oncancel = null; if (d.open) d.close(); resolve(v); };
+    ok.onclick = () => done(true); no.onclick = () => done(false);
+    d.oncancel = e => { e.preventDefault(); done(false); };
+    d.showModal(); no.focus();
+  });
 }
 
 const ui = {
@@ -333,25 +508,48 @@ async function compressImage(file, max = 1280, quality = 0.6) {
     const c = document.createElement('canvas');
     c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', quality);
+    const dataUrl = c.toDataURL('image/jpeg', quality);
+    const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', quality));
+    return { dataUrl, blob };
   } finally { URL.revokeObjectURL(url); }
 }
-// Pending photo for the open form: null = untouched, 'remove' = delete, otherwise a data URL.
-async function commitPhoto(key) {
-  const p = ui.pendingPhoto; ui.pendingPhoto = null;
-  if (p == null) return undefined;
-  if (p === 'remove') { await photos.del(key); return false; }
-  try { await photos.set(key, p); return true; } catch { toast('⚠️ Could not save the photo'); return false; }
+// Can this view attach photos? (Artifact: only people who can edit get the asset store.)
+const photosEnabled = () => !IS_ARTIFACT || !!Platform.assets;
+const findRecord = id => S.purchases.find(x => x.id === id) || S.expenses.find(x => x.id === id);
+async function photoSrc(rec) {
+  if (!rec || !rec.photo) return null;
+  if (typeof rec.photo === 'string') return '/_blob/' + rec.photo;
+  return photos.get(rec.id).catch(() => null);
 }
-const photoPicker = (hasPhoto, key) => `<div class="photo-box">
-  <label class="btn sm">📷 ${hasPhoto ? 'Replace' : 'Add'} receipt photo<input type="file" accept="image/*" capture="environment" data-change="photo" hidden></label>
-  <div class="photo-preview" data-key="${key || ''}">${hasPhoto ? '<span class="muted small">Loading…</span>' : ''}</div></div>`;
+async function storePhoto(key, pic) {
+  if (Platform.assets) return (await Platform.assets.upload(pic.blob)).id;
+  await photos.set(key, pic.dataUrl); return true;
+}
+function dropPhoto(rec) {
+  if (!rec || !rec.photo) return;
+  if (typeof rec.photo === 'string') Platform.assets && Platform.assets.delete(rec.photo).catch(() => { });
+  else photos.del(rec.id);
+}
+// Pending photo for the open form: null = untouched, 'remove' = delete, otherwise {dataUrl, blob}.
+async function commitPhoto(rec) {
+  const p = ui.pendingPhoto; ui.pendingPhoto = null;
+  if (p == null) return;
+  if (p === 'remove') { dropPhoto(rec); rec.photo = false; return; }
+  try {
+    const old = rec.photo;
+    rec.photo = await storePhoto(rec.id, p);
+    if (typeof old === 'string' && old !== rec.photo) Platform.assets && Platform.assets.delete(old).catch(() => { });
+  } catch { toast('⚠️ Could not save the photo'); }
+}
+const photoPicker = (rec) => !photosEnabled() ? '' : `<div class="photo-box">
+  <label class="btn sm">📷 ${rec && rec.photo ? 'Replace' : 'Add'} receipt photo<input type="file" accept="image/*" data-change="photo" hidden></label>
+  <div class="photo-preview" data-key="${rec && rec.photo ? rec.id : ''}">${rec && rec.photo ? '<span class="muted small">Loading…</span>' : ''}</div></div>`;
 async function fillPhotoPreview() {
   const el = $('.photo-preview[data-key]:not([data-key=""])'); if (!el) return;
-  const src = await photos.get(el.dataset.key).catch(() => null);
+  const src = await photoSrc(findRecord(el.dataset.key));
   el.innerHTML = src ? photoPreviewInner(src) : '';
 }
-const photoPreviewInner = src => `<img src="${src}" alt="Receipt" data-action="zoom-photo"><button type="button" class="btn sm danger-ghost" data-action="photo-remove">Remove photo</button>`;
+const photoPreviewInner = src => `<img src="${src}" alt="Receipt"><button type="button" class="btn sm danger-ghost" data-action="photo-remove">Remove photo</button>`;
 
 // ---------- Rendering helpers ----------
 const badge = (t, cls = '') => `<span class="badge ${cls}">${esc(t)}</span>`;
@@ -397,6 +595,7 @@ const isEmpty = () => !S.products.length && !S.sales.length && !S.expenses.lengt
 const views = {};
 
 views.home = () => {
+  if (isEmpty() && Platform.booting) return `<section class="card hero"><h2>Loading your truck…</h2><p class="muted small">Getting your stock, sales and expenses.</p></section>`;
   if (isEmpty()) return `
     <section class="card hero">
       <h1>Welcome aboard! 🦐</h1>
@@ -424,8 +623,8 @@ views.home = () => {
   const t = totals(range), pt = totals(prevR);
   const target = S.settings.foodCostTarget / 100;
   const be = breakEven();
-  const lastBackup = localStorage.getItem('truckbook.lastBackup');
-  const needBackup = !lastBackup || daysBetween(lastBackup, today()) >= 7;
+  let lastBackup = null; try { lastBackup = localStorage.getItem('truckbook.lastBackup'); } catch { }
+  const needBackup = !S.sample && (!lastBackup || daysBetween(lastBackup, today()) >= 7);
   const fc4 = totals([addDays(range[1], -27), range[1]]).foodCost; // rolling 4 weeks smooths out weekly shopping
   const expiring = S.products.filter(isExpiring).sort((a, b) => daysLeft(a) - daysLeft(b));
   const low = S.products.filter(isLow);
@@ -434,6 +633,9 @@ views.home = () => {
   const badDishes = S.menu.filter(d => d.price > 0 && dishCost(d) / d.price > target);
 
   return `
+  ${S.sample ? `<section class="card sample-note row between wrap gap">
+    <span><b>You're looking at sample data</b> for a made-up truck, “${esc(S.settings.name)}”. Nothing here is yours.</span>
+    <button class="btn sm primary" data-action="clear-sample">Clear it and start mine</button></section>` : ''}
   <section class="card">
     ${periodNav('week', ui.weekOffset, 'week-nav')}
     <div class="kpis">
@@ -447,7 +649,7 @@ views.home = () => {
   </section>
 
   ${needBackup ? `<section class="card backup-nag row between">
-    <span>💾 ${lastBackup ? `Last backup was ${daysBetween(lastBackup, today())} days ago.` : 'You haven’t made a backup yet.'} <span class="muted small">Your data only lives on this device.</span></span>
+    <span>💾 ${lastBackup ? `Last backup was ${daysBetween(lastBackup, today())} days ago.` : 'You haven’t made a backup yet.'} <span class="muted small">${Sync.on ? 'Your data is saved to your account; a backup file is an extra copy you control.' : 'Your data only lives on this device.'}</span></span>
     <button class="btn sm primary" data-action="backup">Back up</button></section>` : ''}
 
   ${be ? `<section class="card">
@@ -664,10 +866,10 @@ function draftHTML(d) {
       <button type="button" class="btn sm" data-action="add-product">+ New item</button>
     </div>
     <div class="alert-row total"><span>Total</span><b id="draftTotal">${money(sum(d.lines, lineTotal))}</b></div>
-    <div class="photo-box">
-      <label class="btn sm">📷 Receipt photo<input type="file" accept="image/*" capture="environment" data-change="photo" hidden></label>
-      <div class="photo-preview">${d.photo ? photoPreviewInner(d.photo) : ''}</div>
-    </div>
+    ${photosEnabled() ? `<div class="photo-box">
+      <label class="btn sm">📷 Receipt photo<input type="file" accept="image/*" data-change="photo" hidden></label>
+      <div class="photo-preview">${d.photo ? photoPreviewInner(d.photo.dataUrl) : ''}</div>
+    </div>` : ''}
     <div class="row end gap"><button class="btn" data-action="draft-cancel">Cancel</button><button class="btn primary" data-action="draft-save">Save purchase</button></div>
   </div>`;
 }
@@ -819,7 +1021,7 @@ views.expenses = () => {
   </section>
   <section class="card">
     ${list.length ? list.map(e => {
-      const photoKey = e.purchaseId ? (S.purchases.find(p => p.id === e.purchaseId)?.photo ? e.purchaseId : null) : (e.photo ? e.id : null);
+      const photoKey = e.purchaseId ? (S.purchases.find(p => p.id === e.purchaseId)?.photo ? e.purchaseId : null) : (e.photo ? e.id : null); // record id
       return `<div class="item compact" ${e.purchaseId ? '' : `data-action="edit-expense" data-id="${e.id}"`}>
       <div class="item-main"><div class="item-title">${esc(e.category)} ${e.purchaseId ? badge('from purchase') : ''}${e.recurringId ? badge('🔁 auto') : ''}</div>
       <div class="muted small">${longDate(e.date)}${e.note ? ' · ' + esc(e.note) : ''}</div></div>
@@ -871,7 +1073,7 @@ function expenseModal(id) {
     </div>
     <label>Category<select name="category">${EXPENSE_CATS.map(c => `<option ${c === e.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
     <label>Note<input name="note" value="${esc(e.note)}" placeholder="e.g. Shell station, 14 gal"></label>
-    ${photoPicker(!!e.photo, id)}
+    ${photoPicker(id ? e : null)}
     <p class="muted small">Buying food or produce? Log it in <b>Buy</b> instead so your stock and prices update too.</p>
     <div class="row between actions">
       ${id ? `<button type="button" class="btn danger-ghost" data-action="delete-expense" data-id="${id}">Delete</button>` : '<span></span>'}
@@ -994,15 +1196,15 @@ const moreViews = {
         </div></section>`;
   },
   data() {
-    const last = localStorage.getItem('truckbook.lastBackup');
+    let last = null; try { last = localStorage.getItem('truckbook.lastBackup'); } catch { }
     return `<section class="card"><h2>💾 Backup</h2>
-      <p class="muted small">Everything lives on this device. Download a backup every week (email it to yourself or put it in Google Drive) — if the phone gets lost, you keep your numbers.</p>
+      <p class="muted small">${Sync.on ? 'Your data is saved to your Claude account and shows up on any device where you open this page. A backup file is an extra copy you keep — handy for your accountant or if you ever move to another app.' : 'Everything lives on this device. Download a backup every week (email it to yourself or put it in Google Drive) — if the phone gets lost, you keep your numbers.'}</p>
       <p class="small">Last backup: <b>${last ? longDate(last) : 'never'}</b></p>
       <div class="row wrap gap"><button class="btn primary" data-action="backup">Download backup</button>
         <label class="btn">Restore from file<input type="file" accept=".json,application/json" data-change="import" hidden></label></div>
     </section>
     <section class="card"><h2>Sample data</h2>
-      <p class="muted small">Replace everything with a demo seafood truck to explore the app.</p>
+      <p class="muted small">Replace everything with a made-up seafood truck to explore the app.</p>
       <button class="btn" data-action="load-sample">Load sample data</button></section>
     <section class="card danger-zone"><h2>Danger zone</h2>
       <button class="btn danger-ghost" data-action="wipe">Erase all data</button></section>`;
@@ -1035,17 +1237,29 @@ function render() {
   $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
   $('#bizName').textContent = S.settings.name || 'TruckBook';
   $('#todayLabel').textContent = longDate(today());
-  document.title = `${S.settings.name || 'TruckBook'} · TruckBook`;
+  if (!IS_ARTIFACT) document.title = `${S.settings.name || 'TruckBook'} · TruckBook`;
+  renderStatus();
 }
-function go(tab) { ui.tab = tab; history.replaceState(null, '', '#' + tab); render(); window.scrollTo(0, 0); }
+function go(tab) {
+  ui.tab = tab;
+  try { history.replaceState(null, '', '#' + tab); } catch { try { location.hash = tab; } catch { } }
+  render(); window.scrollTo(0, 0);
+}
 const refreshInv = () => { const el = $('#invList'); el ? (el.innerHTML = invListHTML()) : render(); };
 
 // ---------- CSV / files ----------
-function download(name, text, type = 'text/csv') {
+async function download(name, text, type = 'text/csv') {
+  if (IS_ARTIFACT) {
+    const dl = await cap('downloads');
+    if (!dl) { toast('Saving files isn’t available here'); return false; }
+    try { await dl.save({ filename: name, data: text }); return true; }
+    catch (e) { if (!e || e.code !== 'declined') toast('Couldn’t save the file'); return false; }
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type }));
   a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  return true;
 }
 const csvCell = v => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 const toCSV = rows => rows.map(r => r.map(csvCell).join(',')).join('\n');
@@ -1067,14 +1281,19 @@ const actions = {
   'more-tab': el => { ui.moreTab = el.dataset.k; render(); },
   'close-modal': closeModal,
   'start-fresh': () => { go('stock'); productModal(); },
-  'load-sample': () => {
-    if (!isEmpty() && !confirm('Replace ALL current data with the sample truck?')) return;
-    loadSample(); ui.draft = null; go('home'); toast('Sample data loaded — poke around!');
+  'load-sample': async () => {
+    if (!isEmpty() && !S.sample && !await ask('Replace ALL your data with the sample truck? Your own records will be erased.', 'Replace everything')) return;
+    wipePhotos(); loadSample(); ui.draft = null; go('home'); toast('Sample data loaded — poke around!');
   },
-  wipe: () => {
-    if (!confirm('Erase ALL data on this device? This cannot be undone.')) return;
-    if (!confirm('Really sure? Consider downloading a backup first.')) return;
-    S = emptyState(); save(); photos.clear(); localStorage.removeItem('truckbook.lastBackup'); ui.draft = null; go('home'); toast('All data erased');
+  'clear-sample': async () => {
+    if (!await ask('Remove the sample truck and start with an empty TruckBook?', 'Clear sample', false)) return;
+    S = emptyState(); save(); ui.draft = null; go('stock'); productModal(); toast('All clear — add your first item');
+  },
+  wipe: async () => {
+    if (!await ask(`Erase ALL data${Sync.on ? ' from your account and every device' : ' on this device'}? This can’t be undone. Download a backup first if you might want it.`, 'Erase everything')) return;
+    wipePhotos(); S = emptyState(); save(); photos.clear();
+    try { localStorage.removeItem('truckbook.lastBackup'); } catch { }
+    ui.draft = null; go('home'); toast('All data erased');
   },
   // stock
   'add-product': () => productModal(),
@@ -1085,17 +1304,17 @@ const actions = {
     p.qty = r3(Math.max(0, +p.qty + +el.dataset.d * (+p.step || 1)));
     save(); refreshInv();
   },
-  'delete-product': el => {
+  'delete-product': async el => {
     const p = P(el.dataset.id); if (!p) return;
     const used = S.menu.filter(d => d.ingredients.some(i => i.productId === p.id));
-    if (!confirm(`Delete "${p.name}"?${used.length ? `\nIt will be removed from: ${used.map(d => d.name).join(', ')}` : ''}\nPast purchases and sales stay in your records.`)) return;
+    if (!await ask(`Delete "${p.name}"?${used.length ? `\nIt will be removed from: ${used.map(d => d.name).join(', ')}` : ''}\nPast purchases and sales stay in your records.`)) return;
     used.forEach(d => d.ingredients = d.ingredients.filter(i => i.productId !== p.id));
     S.products = S.products.filter(x => x.id !== p.id);
     save(); closeModal(); render(); toast('Item deleted');
   },
-  toss: el => {
+  toss: async el => {
     const p = P(el.dataset.id); if (!p) return;
-    if (!confirm(`Log ${fmtQty(p.qty)} ${p.unit} of ${p.name} (${money(p.qty * p.cost)}) as waste?`)) return;
+    if (!await ask(`Log ${fmtQty(p.qty)} ${p.unit} of ${p.name} (${money(p.qty * p.cost)}) as waste?`, 'Log as waste')) return;
     recordWaste(p.id, p.qty, 'Expired / spoiled'); save(); render(); toast('Logged as waste');
   },
   // buy
@@ -1110,19 +1329,20 @@ const actions = {
   'draft-add': () => { ui.draft.lines.push(blankLine()); render(); },
   'draft-remove': el => { ui.draft.lines.splice(+el.dataset.i, 1); if (!ui.draft.lines.length) ui.draft.lines.push(blankLine()); render(); },
   'draft-cancel': () => { ui.draft = null; render(); },
-  'draft-save': () => {
+  'draft-save': async () => {
     const d = ui.draft;
     const lines = d.lines.filter(l => l.productId && num(l.qty) > 0).map(l => ({ productId: l.productId, qty: r3(num(l.qty)), unitCost: r3(num(l.unitCost)) }));
     if (!lines.length) return toast('Add at least one item with a quantity');
-    if (d.lines.some(l => l.productId && num(l.qty) > 0 && optNum(l.unitCost) == null) && !confirm('Some lines have no price. Save them at $0?')) return;
+    if (d.lines.some(l => l.productId && num(l.qty) > 0 && optNum(l.unitCost) == null) && !await ask('Some lines have no price. Save them at $0?', 'Save at $0', false)) return;
     const pur = { id: uid(), date: d.date || today(), supplier: (d.supplier || '').trim(), lines, total: r3(sum(lines, l => l.qty * l.unitCost)), ts: Date.now() };
     applyPurchase(pur);
-    if (d.photo) { pur.photo = true; photos.set(pur.id, d.photo).catch(() => { pur.photo = false; save(); toast('⚠️ Could not save the photo'); }); }
+    if (d.photo) storePhoto(pur.id, d.photo).then(v => { pur.photo = v; save(); render(); }).catch(() => toast('⚠️ Could not save the photo'));
     save(); ui.draft = null; render(); toast(`Purchase saved · ${money(pur.total)}`);
   },
-  'delete-purchase': el => {
-    if (!confirm('Delete this purchase? Its quantities will be removed from stock and its expense deleted.')) return;
-    deletePurchase(el.dataset.id); photos.del(el.dataset.id); save(); render(); toast('Purchase deleted');
+  'delete-purchase': async el => {
+    if (!await ask('Delete this purchase? Its quantities will be removed from stock and its expense deleted.')) return;
+    dropPhoto(S.purchases.find(p => p.id === el.dataset.id));
+    deletePurchase(el.dataset.id); save(); render(); toast('Purchase deleted');
   },
   'share-list': () => {
     const list = shoppingList();
@@ -1145,11 +1365,10 @@ const actions = {
   },
   // photos
   'view-photo': async el => {
-    const src = await photos.get(el.dataset.id).catch(() => null);
+    const src = await photoSrc(findRecord(el.dataset.id));
     if (!src) return toast('Photo not found on this device');
     openModal(`<div class="photo-full"><img src="${src}" alt="Receipt"></div><div class="row end"><button class="btn" data-action="close-modal">Close</button></div>`);
   },
-  'zoom-photo': el => { const w = window.open(); if (w) w.document.write(`<img src="${el.src}" style="max-width:100%">`); },
   'photo-remove': el => {
     if (el.closest('#modal')) ui.pendingPhoto = 'remove'; else if (ui.draft) ui.draft.photo = null;
     el.closest('.photo-preview').innerHTML = '';
@@ -1157,45 +1376,63 @@ const actions = {
   // recurring
   'add-recurring': () => recurringModal(),
   'edit-recurring': el => recurringModal(el.dataset.id),
-  'delete-recurring': el => {
-    if (!confirm('Stop this recurring bill? Expenses already added are kept.')) return;
+  'delete-recurring': async el => {
+    if (!await ask('Stop this recurring bill? Expenses already added are kept.', 'Stop bill')) return;
     S.recurring = S.recurring.filter(r => r.id !== el.dataset.id); save(); closeModal(); render();
   },
   // sales
-  'delete-sale': el => {
+  'delete-sale': async el => {
     const s = S.sales.find(x => x.id === el.dataset.id); if (!s) return;
-    if (!confirm('Delete this sales day?')) return;
+    if (!await ask('Delete this sales day?')) return;
     restoreStock(s.deductions); S.sales = S.sales.filter(x => x !== s); save(); render(); toast('Deleted');
   },
   // expenses
   'add-expense': () => expenseModal(),
   'edit-expense': el => expenseModal(el.dataset.id),
-  'delete-expense': el => { if (!confirm('Delete this expense?')) return; S.expenses = S.expenses.filter(x => x.id !== el.dataset.id); photos.del(el.dataset.id); save(); closeModal(); render(); },
+  'delete-expense': async el => {
+    if (!await ask('Delete this expense?')) return;
+    dropPhoto(S.expenses.find(x => x.id === el.dataset.id));
+    S.expenses = S.expenses.filter(x => x.id !== el.dataset.id); save(); closeModal(); render();
+  },
   // menu
   'add-dish': () => { if (!S.products.length) { toast('Add your ingredients in Stock first'); return go('stock'); } dishModal(); },
   'edit-dish': el => dishModal(el.dataset.id),
   'ing-add': () => { $('#ingRows').insertAdjacentHTML('beforeend', ingRowHTML()); },
   'ing-remove': el => { el.closest('.ing-row').remove(); updateDishCalc($('#modal form')); },
-  'delete-dish': el => { if (!confirm('Delete this dish?')) return; S.menu = S.menu.filter(d => d.id !== el.dataset.id); save(); closeModal(); render(); },
+  'delete-dish': async el => { if (!await ask('Delete this dish?')) return; S.menu = S.menu.filter(d => d.id !== el.dataset.id); save(); closeModal(); render(); },
   // waste
-  'delete-waste': el => {
-    const w = S.waste.find(x => x.id === el.dataset.id); if (!w || !confirm('Delete this entry and put the quantity back in stock?')) return;
+  'delete-waste': async el => {
+    const w = S.waste.find(x => x.id === el.dataset.id); if (!w || !await ask('Delete this entry and put the quantity back in stock?')) return;
     restoreStock([{ productId: w.productId, qty: w.qty }]); S.waste = S.waste.filter(x => x !== w); save(); render();
   },
   // data
   csv: el => download(`truckbook-${el.dataset.k}-${today()}.csv`, toCSV(CSV[el.dataset.k]())),
   backup: async () => {
-    const pics = await photos.all().catch(() => ({}));
-    download(`truckbook-backup-${today()}.json`, JSON.stringify({ ...S, photos: pics }), 'application/json');
-    localStorage.setItem('truckbook.lastBackup', today()); render();
-    toast(`Backup downloaded${Object.keys(pics).length ? ` (with ${Object.keys(pics).length} receipt photos)` : ''} — keep it somewhere safe`);
+    const pics = IS_ARTIFACT ? {} : await photos.all().catch(() => ({}));
+    const ok = await download(`truckbook-backup-${today()}.json`, JSON.stringify({ ...S, photos: pics }), 'application/json');
+    if (!ok) return;
+    try { localStorage.setItem('truckbook.lastBackup', today()); } catch { }
+    render();
+    toast(`Backup saved${Object.keys(pics).length ? ` (with ${Object.keys(pics).length} receipt photos)` : ''} — keep it somewhere safe`);
   },
 };
+function showCopyBox(text) {
+  openModal(`<h2>Copy this list</h2><p class="muted small">Select all and copy, then paste it into a text message.</p>
+    <textarea class="copybox" id="copybox" readonly>${esc(text)}</textarea>
+    <div class="row end"><button class="btn" data-action="close-modal">Close</button></div>`);
+  const t = $('#copybox'); t.focus(); t.select();
+}
 async function shareText(text) {
-  try {
-    if (navigator.share) await navigator.share({ text });
-    else { await navigator.clipboard.writeText(text); toast('Copied — paste it in a text message'); }
-  } catch (e) { if (e.name !== 'AbortError') { try { await navigator.clipboard.writeText(text); toast('Copied'); } catch { alert(text); } } }
+  if (!IS_ARTIFACT && navigator.share) {
+    try { await navigator.share({ text }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  // Called straight from the click so the clipboard accepts it.
+  let p;
+  try { p = navigator.clipboard.writeText(text); } catch { return showCopyBox(text); }
+  p.then(() => toast('Copied — paste it in a text message'), () => showCopyBox(text));
+}
+function wipePhotos() {
+  [...S.purchases, ...S.expenses].forEach(r => { if (typeof r.photo === 'string') dropPhoto(r); });
 }
 
 // ---------- Forms ----------
@@ -1225,8 +1462,7 @@ const forms = {
     let e = id && S.expenses.find(x => x.id === id);
     if (e) Object.assign(e, data);
     else { e = { id: uid(), ts: Date.now(), ...data }; S.expenses.push(e); }
-    const ph = await commitPhoto(e.id);
-    if (ph !== undefined) e.photo = ph;
+    await commitPhoto(e);
     save(); closeModal(); render(); toast('Expense saved');
   },
   recurring(fd) {
@@ -1270,7 +1506,7 @@ const changes = {
     try {
       const data = await compressImage(f);
       if (el.closest('#modal')) ui.pendingPhoto = data; else if (ui.draft) ui.draft.photo = data;
-      el.closest('.photo-box').querySelector('.photo-preview').innerHTML = photoPreviewInner(data);
+      el.closest('.photo-box').querySelector('.photo-preview').innerHTML = photoPreviewInner(data.dataUrl);
     } catch { toast('Could not read that photo'); }
     el.value = '';
   },
@@ -1281,13 +1517,19 @@ const changes = {
       let data;
       try { data = JSON.parse(rd.result); if (!data || !Array.isArray(data.products)) throw new Error('bad'); }
       catch { return toast('That file is not a TruckBook backup'); }
-      if (!confirm('Replace current data with this backup?')) return;
+      if (!await ask('Replace your current data with this backup?', 'Restore backup')) return;
       const pics = data.photos || {}; delete data.photos;
+      wipePhotos();
       S = Object.assign(emptyState(), data); S.settings = Object.assign(emptyState().settings, data.settings);
       save(); ui.draft = null;
-      await photos.clear();
-      for (const [k, v] of Object.entries(pics)) await photos.set(k, v).catch(() => {});
-      localStorage.setItem('truckbook.lastBackup', today());
+      if (!IS_ARTIFACT) {
+        await photos.clear();
+        for (const [k, v] of Object.entries(pics)) await photos.set(k, v).catch(() => {});
+      } else {
+        // Photos saved by another copy of the app can't come along: drop dangling device-only photo flags.
+        [...S.purchases, ...S.expenses].forEach(r => { if (r.photo === true) r.photo = false; });
+      }
+      try { localStorage.setItem('truckbook.lastBackup', today()); } catch { }
       render(); toast('Backup restored');
     };
     rd.readAsText(f);
@@ -1338,6 +1580,7 @@ window.addEventListener('hashchange', () => { const t = location.hash.slice(1); 
 // ---------- Sample data ----------
 function loadSample() {
   S = emptyState();
+  S.sample = true;
   S.settings.name = 'Ocean Tacos';
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const mk = (name, category, unit, cost, par, low, shelfLife, supplier, step = 1) => {
@@ -1426,9 +1669,14 @@ function loadSample() {
 }
 
 // ---------- Boot ----------
-runRecurring();
+const canRunBills = () => !IS_ARTIFACT || (Sync.on ? Sync.ready && !Sync.readonly : !Platform.booting);
+if (canRunBills()) runRecurring();
 render();
-document.addEventListener('visibilitychange', () => { if (!document.hidden && runRecurring()) render(); });
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+initPlatform();
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (Sync.pending) { clearTimeout(Sync.timer); flush(); } return; } // closing or switching apps: save now
+  if (canRunBills() && runRecurring()) render();
+});
+if (!IS_ARTIFACT && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }

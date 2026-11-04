@@ -47,6 +47,21 @@ It's a simple web app: no server, no account, no monthly fee. It works offline a
 
 Want to look around first? Tap **Explore with sample data** (or More → Data → Load sample data).
 
+## Use it as a claude.ai Artifact (recommended)
+
+Live page: https://claude.ai/artifact/N1yXPDNdfqSCn7PriSZF3S (private to you until you share it).
+
+As an artifact, TruckBook saves everything to your Claude account instead of only the phone:
+your data shows up on any device where you open the link, receipt photos are stored with the
+artifact, and backups and CSV exports are offered as files to save. Only you and people you give
+**Edit** access in the Share menu can see or change the data. Give an employee edit access and you
+both work on the same inventory. The pill in the top bar shows **Saved**, **Saving…** or
+**Offline · kept on this device**; offline changes upload the next time the page connects.
+
+To update the artifact after changing the code, run `python3 artifact/build.py`. It inlines
+`index.html`, `styles.css`, `app.js` and the icon into `artifact/truckbook.html`, which is the
+file that gets published.
+
 ## Running it
 
 Open `index.html` in a browser, or serve the folder:
