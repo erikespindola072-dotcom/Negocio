@@ -1,5 +1,5 @@
 // Offline support: network first, fall back to cache (so updates arrive when online).
-const CACHE = 'truckbook-v1';
+const CACHE = 'truckbook-v2';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {

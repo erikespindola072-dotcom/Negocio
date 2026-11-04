@@ -14,11 +14,19 @@ It's a simple web app: no server, no account, no monthly fee. It works offline a
    - resets the "fresh for N days" clock on perishables
    - records the total as an **Ingredients** expense
 
+**📋 Plan ahead (Buy tab)**
+- Once you count plates sold for a few days, the app forecasts your next service days. It averages the same weekday over the last 8 weeks, so Fridays are forecast from past Fridays.
+- It turns that forecast into an ingredient list: what you need, what you have (expired stock doesn't count), and what to buy, with an optional safety extra (+10%, +20%…).
+- **Buy these** starts a purchase from the shortfall. **Share prep list** texts it to whoever does prep.
+
+**📷 Receipt photos**: attach a photo of the receipt to any purchase or expense. Photos are shrunk so they don't fill up your phone, and they're included in backups.
+
 **End of each service day → Sales tab**
 - Enter cash and card totals. If you also count **plates sold**, the ingredients are subtracted from stock automatically.
 
 **Anything else you pay for → Costs tab**
 - Fuel, propane, commissary, permits, insurance, repairs, card fees…
+- **🔁 Recurring bills**: set up rent, insurance, phone or loan payments once and they're added automatically every month or week. If you set a start date in the past, the missed charges are filled in.
 
 **Menu tab: what each plate really costs**
 - Add each dish with its ingredients per plate (use the item's unit: ¼ lb shrimp = `0.25`, 3 tortillas from a 30-pack = `0.1`).
@@ -27,11 +35,13 @@ It's a simple web app: no server, no account, no monthly fee. It works offline a
 **Home tab: the weekly picture**
 - Sales, expenses, profit and food cost % (rolling 4 weeks), compared with the previous week
 - ⏰ **Use it or lose it**: perishables about to expire. Run a special, or tap *Toss* to log them as waste
+- ⚖️ **Break-even**: how much you need to sell per service day to cover your costs, and whether you're above or below it
+- 💾 Reminder when your last backup is more than a week old
 - 📉 Running low · 💲 Biggest price changes · 🍽️ Dishes over food-cost goal · 8-week chart
 
 **More tab**
 - 🗑️ **Waste log**: what you throw away is money lost. Tracking it shows what you over-buy.
-- 📊 **Reports**: profit & loss by month and week, plus CSV export for your accountant and taxes.
+- 📊 **Reports**: 🏆 which supplier is cheapest for each item, 🎢 the most volatile prices, profit & loss by month and week, plus CSV export for your accountant and taxes.
 - 💾 **Backup / restore**: your data lives on this device. **Download a backup every week.**
 - ⚙️ Settings: business name, currency, first day of the week, food-cost goal.
 
@@ -63,10 +73,7 @@ python3 -m http.server 8000   # then open http://localhost:8000
 ## Ideas for next steps
 
 - **Cloud sync and multiple devices** (e.g. Supabase) so you and an employee share one inventory, with automatic backups.
-- **Receipt photos** attached to purchases and expenses for taxes.
-- **Recurring expenses** (insurance, commissary rent) added automatically each month.
-- **Price comparison by supplier**: which store is cheapest for limes this month.
-- **Prep list**: "for 80 plates Saturday you need 24 lb shrimp, 20 avocados…" based on past sales by weekday and location.
-- **Break-even tracker**: how many plates a day cover your fixed costs.
+- **Location-aware forecasts**: brewery Saturdays vs. downtown Tuesdays.
+- **First-in-first-out freshness**: track each delivery separately instead of one freshness date per item.
 - **Labor and hours**, plus **sales tax** set-aside.
 - **Square / Toast / Clover import**, so sales come in from your POS automatically.

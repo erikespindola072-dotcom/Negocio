@@ -48,7 +48,7 @@ function emptyState() {
   return {
     version: 1,
     settings: { name: 'My Seafood Truck', currency: 'USD', weekStart: 1, foodCostTarget: 30 },
-    products: [], prices: [], purchases: [], expenses: [], sales: [], waste: [], menu: [], suppliers: [], locations: [],
+    products: [], prices: [], purchases: [], expenses: [], sales: [], waste: [], menu: [], suppliers: [], locations: [], recurring: [],
   };
 }
 function load() {
@@ -78,6 +78,8 @@ const ui = {
   expOffset: 0,
   salesOffset: 0,
   moreTab: 'waste',
+  pendingPhoto: null,
+  plan: { days: 3, buffer: 10 },
 };
 
 // ---------- Domain helpers ----------
@@ -196,6 +198,161 @@ function recordWaste(pid, qty, reason, date = today()) {
   return w;
 }
 
+// ----- Recurring bills -----
+function addMonthsClamped(start, i) {
+  const s = parseISO(start), d = new Date(s.getFullYear(), s.getMonth() + i, 1);
+  d.setDate(Math.min(s.getDate(), new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  return toISO(d);
+}
+const occurrence = (r, i) => r.freq === 'weekly' ? addDays(r.start, 7 * i) : addMonthsClamped(r.start, i);
+function nextDue(r) {
+  for (let i = 0; i < 1000; i++) { const d = occurrence(r, i); if (!r.lastRun || d > r.lastRun) return d; }
+  return null;
+}
+const monthlyEquivalent = r => r.freq === 'weekly' ? r.amount * 52 / 12 : r.amount;
+// Adds any bills that have come due since they last ran. Safe to call repeatedly.
+function runRecurring() {
+  let added = 0;
+  const t = today();
+  (S.recurring || []).forEach(r => {
+    for (let guard = 0; guard < 400; guard++) {
+      const d = nextDue(r);
+      if (!d || d > t) break;
+      S.expenses.push({ id: uid(), date: d, category: r.category, amount: r.amount, note: r.note || 'Recurring bill', recurringId: r.id, ts: Date.now() });
+      r.lastRun = d; added++;
+    }
+  });
+  if (added) save();
+  return added;
+}
+
+// ----- Forecast: what will I sell, what do I need? -----
+// Averages plates sold on the same weekday over the last 8 weeks (falls back to all recent days).
+function salesDaysWithPlates(from, to) {
+  const byDate = {};
+  S.sales.filter(s => s.date >= from && s.date < to && s.plates?.length).forEach(s => {
+    const m = (byDate[s.date] ||= {});
+    s.plates.forEach(p => m[p.menuId] = (m[p.menuId] || 0) + p.count);
+  });
+  return byDate;
+}
+function forecast(date) {
+  const hist = salesDaysWithPlates(addDays(date, -56), date);
+  const wd = parseISO(date).getDay();
+  let days = Object.entries(hist).filter(([d]) => parseISO(d).getDay() === wd);
+  if (!days.length) days = Object.entries(hist).filter(([d]) => d >= addDays(date, -28));
+  const out = {};
+  if (!days.length) return out;
+  days.forEach(([, m]) => Object.entries(m).forEach(([id, n]) => out[id] = (out[id] || 0) + n));
+  Object.keys(out).forEach(id => { out[id] = Math.round(out[id] / days.length); if (!out[id] || !dish(id)) delete out[id]; });
+  return out;
+}
+function planDays(n) {
+  const recent = S.sales.filter(s => s.date >= addDays(today(), -56));
+  const open = new Set(recent.map(s => parseISO(s.date).getDay()));
+  const loggedToday = S.sales.some(s => s.date === today());
+  const out = [];
+  for (let d = loggedToday ? addDays(today(), 1) : today(), i = 0; out.length < n && i < 60; d = addDays(d, 1), i++) {
+    if (!open.size || open.has(parseISO(d).getDay())) out.push(d);
+  }
+  return out;
+}
+function buildPlan(nDays, bufferPct) {
+  const days = planDays(nDays).map(date => ({ date, plates: forecast(date) }));
+  const byDish = {};
+  days.forEach(d => Object.entries(d.plates).forEach(([id, n]) => byDish[id] = (byDish[id] || 0) + n));
+  const need = {};
+  Object.entries(byDish).forEach(([id, n]) => (dish(id)?.ingredients || []).forEach(i => need[i.productId] = (need[i.productId] || 0) + i.qty * n * (1 + bufferPct / 100)));
+  const rows = Object.entries(need).map(([pid, q]) => ({ p: P(pid), need: q })).filter(x => x.p)
+    .map(x => {
+      const dl = daysLeft(x.p), usable = dl != null && dl < 0 ? 0 : +x.p.qty; // expired stock doesn't count
+      const short = x.need - usable;
+      return { ...x, have: usable, expired: usable < x.p.qty, buy: short > 0.01 ? roundBuy(x.p, short) : 0 };
+    })
+    .sort((a, b) => (b.buy > 0) - (a.buy > 0) || (a.p.supplier || '~').localeCompare(b.p.supplier || '~') || a.p.name.localeCompare(b.p.name));
+  const revenue = sum(Object.entries(byDish), ([id, n]) => n * (dish(id)?.price || 0));
+  return { days, byDish, rows, revenue, cost: sum(rows, r => r.buy * (r.p.cost || 0)) };
+}
+
+// ----- Break-even (last 4 weeks) -----
+function breakEven() {
+  const r = [addDays(today(), -27), today()], t = totals(r);
+  if (!t.days || t.foodCost == null || t.foodCost >= 1) return null;
+  const opex = t.exp - t.ingredients;
+  const neededTotal = opex / (1 - t.foodCost);
+  const plates = sum(S.sales.filter(s => inRange(s.date, r)), s => sum(s.plates || [], p => p.count));
+  const avgTicket = plates ? t.rev / plates : null;
+  return { perDay: neededTotal / t.days, avgDay: t.rev / t.days, opex, foodCost: t.foodCost, days: t.days, platesPerDay: avgTicket ? neededTotal / t.days / avgTicket : null };
+}
+
+// ----- Supplier price comparison -----
+function supplierPrices(pid, sinceDays = 90) {
+  const since = addDays(today(), -sinceDays), out = {};
+  priceHistory(pid).filter(h => h.purchaseId && h.supplier && h.date >= since).forEach(h => {
+    const s = (out[h.supplier] ||= { supplier: h.supplier, n: 0, total: 0, last: null });
+    s.n++; s.total += h.unitCost; s.last = h;
+  });
+  return Object.values(out).map(s => ({ ...s, avg: s.total / s.n })).sort((a, b) => a.avg - b.avg);
+}
+
+// ----- Receipt photos (IndexedDB — too big for localStorage) -----
+const photos = (() => {
+  let dbp;
+  const open = () => dbp ||= new Promise((res, rej) => {
+    const r = indexedDB.open('truckbook', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('photos');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  const tx = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('photos', mode), req = fn(t.objectStore('photos'));
+      t.oncomplete = () => res(req && req.result); t.onerror = () => rej(t.error);
+    });
+  };
+  return {
+    get: k => tx('readonly', s => s.get(k)),
+    set: (k, v) => tx('readwrite', s => s.put(v, k)),
+    del: k => tx('readwrite', s => s.delete(k)).catch(() => {}),
+    clear: () => tx('readwrite', s => s.clear()).catch(() => {}),
+    async all() {
+      const db = await open();
+      return new Promise((res, rej) => {
+        const out = {}, t = db.transaction('photos'), c = t.objectStore('photos').openCursor();
+        c.onsuccess = () => { const cur = c.result; if (cur) { out[cur.key] = cur.value; cur.continue(); } };
+        t.oncomplete = () => res(out); t.onerror = () => rej(t.error);
+      });
+    },
+  };
+})();
+async function compressImage(file, max = 1280, quality = 0.6) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const sc = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', quality);
+  } finally { URL.revokeObjectURL(url); }
+}
+// Pending photo for the open form: null = untouched, 'remove' = delete, otherwise a data URL.
+async function commitPhoto(key) {
+  const p = ui.pendingPhoto; ui.pendingPhoto = null;
+  if (p == null) return undefined;
+  if (p === 'remove') { await photos.del(key); return false; }
+  try { await photos.set(key, p); return true; } catch { toast('⚠️ Could not save the photo'); return false; }
+}
+const photoPicker = (hasPhoto, key) => `<div class="photo-box">
+  <label class="btn sm">📷 ${hasPhoto ? 'Replace' : 'Add'} receipt photo<input type="file" accept="image/*" capture="environment" data-change="photo" hidden></label>
+  <div class="photo-preview" data-key="${key || ''}">${hasPhoto ? '<span class="muted small">Loading…</span>' : ''}</div></div>`;
+async function fillPhotoPreview() {
+  const el = $('.photo-preview[data-key]:not([data-key=""])'); if (!el) return;
+  const src = await photos.get(el.dataset.key).catch(() => null);
+  el.innerHTML = src ? photoPreviewInner(src) : '';
+}
+const photoPreviewInner = src => `<img src="${src}" alt="Receipt" data-action="zoom-photo"><button type="button" class="btn sm danger-ghost" data-action="photo-remove">Remove photo</button>`;
+
 // ---------- Rendering helpers ----------
 const badge = (t, cls = '') => `<span class="badge ${cls}">${esc(t)}</span>`;
 function freshBadge(p) {
@@ -258,8 +415,17 @@ views.home = () => {
     </section>`;
 
   const range = periodRange('week', ui.weekOffset);
-  const t = totals(range), pt = totals(periodRange('week', ui.weekOffset - 1));
+  // For the current (partial) week compare against the same days of last week, not the whole week.
+  const prevR = periodRange('week', ui.weekOffset - 1);
+  if (ui.weekOffset === 0) { // up to yesterday if today's sales aren't logged yet
+    const upTo = S.sales.some(s => s.date === today()) ? today() : addDays(today(), -1);
+    prevR[1] = addDays(prevR[0], daysBetween(range[0], upTo));
+  }
+  const t = totals(range), pt = totals(prevR);
   const target = S.settings.foodCostTarget / 100;
+  const be = breakEven();
+  const lastBackup = localStorage.getItem('truckbook.lastBackup');
+  const needBackup = !lastBackup || daysBetween(lastBackup, today()) >= 7;
   const fc4 = totals([addDays(range[1], -27), range[1]]).foodCost; // rolling 4 weeks smooths out weekly shopping
   const expiring = S.products.filter(isExpiring).sort((a, b) => daysLeft(a) - daysLeft(b));
   const low = S.products.filter(isLow);
@@ -276,8 +442,23 @@ views.home = () => {
       ${kpi('Profit', money(t.profit), t.rev ? `${pct(t.profit / t.rev)} margin` : '', t.profit < 0 ? 'neg' : 'pos')}
       ${kpi('Food cost', pct(fc4), `last 4 weeks · goal ≤ ${S.settings.foodCostTarget}%`, fc4 > target ? 'neg' : fc4 != null ? 'pos' : '')}
     </div>
+    ${ui.weekOffset === 0 && pt.rev && prevR[1] >= prevR[0] ? `<p class="muted small">Compared with the same days last week (${shortDate(prevR[0])}–${shortDate(prevR[1])}).</p>` : ''}
     ${t.waste > 0 ? `<p class="muted small">🗑️ Waste this week: <b>${money(t.waste)}</b></p>` : ''}
   </section>
+
+  ${needBackup ? `<section class="card backup-nag row between">
+    <span>💾 ${lastBackup ? `Last backup was ${daysBetween(lastBackup, today())} days ago.` : 'You haven’t made a backup yet.'} <span class="muted small">Your data only lives on this device.</span></span>
+    <button class="btn sm primary" data-action="backup">Back up</button></section>` : ''}
+
+  ${be ? `<section class="card">
+    <h2>⚖️ Break-even</h2>
+    <p class="small">To cover your running costs (${money(be.opex)} over the last 4 weeks, not counting ingredients) at a ${pct(be.foodCost)} food cost,
+      you need about <b>${money(be.perDay)}</b> in sales per service day${be.platesPerDay ? ` (≈ ${Math.ceil(be.platesPerDay)} orders)` : ''}.</p>
+    <div class="meter"><i style="width:${Math.min(100, (be.avgDay / Math.max(be.perDay, be.avgDay, 1)) * 100)}%" class="${be.avgDay >= be.perDay ? 'ok' : 'bad'}"></i>
+      <b style="left:${Math.min(100, (be.perDay / Math.max(be.perDay, be.avgDay, 1)) * 100)}%"></b></div>
+    <p class="small">You're averaging <b>${money(be.avgDay)}</b>/day →
+      ${be.avgDay >= be.perDay ? `<span class="pos">${money(be.avgDay - be.perDay)} above break-even ✅</span>` : `<span class="neg">${money(be.perDay - be.avgDay)} short</span>`}</p>
+  </section>` : ''}
 
   <section class="quick">
     <button class="btn primary" data-action="goto" data-tab="buy">🛒 Log shopping</button>
@@ -382,6 +563,7 @@ function prodCard(p) {
 function productModal(id) {
   const p = id ? P(id) : { name: '', category: 'produce', unit: 'lb', qty: 0, cost: '', par: '', low: '', shelfLife: '', step: 1, supplier: '', notes: '' };
   const hist = id ? priceHistory(id).slice(-10).reverse() : [];
+  const sups = id ? supplierPrices(id) : [];
   openModal(`
   <form data-form="product" class="form">
     <h2>${id ? 'Edit item' : 'New item'}</h2>
@@ -401,6 +583,9 @@ function productModal(id) {
     <label>Notes<input name="notes" value="${esc(p.notes)}"></label>
     <datalist id="unitList">${UNITS.map(u => `<option value="${u}">`).join('')}</datalist>
     <datalist id="supplierList">${S.suppliers.map(s => `<option value="${esc(s)}">`).join('')}</datalist>
+    ${sups.length > 1 ? `<h3>Price by supplier <span class="muted small">(last 90 days)</span></h3>
+      <table class="table"><tr><th>Supplier</th><th>Avg</th><th>Last</th><th>Buys</th></tr>
+      ${sups.map((s, i) => `<tr><td>${i === 0 ? '🏆 ' : ''}${esc(s.supplier)}</td><td>${money(s.avg)}</td><td>${money(s.last.unitCost)} <span class="muted">${shortDate(s.last.date)}</span></td><td>${s.n}</td></tr>`).join('')}</table>` : ''}
     ${hist.length ? `<h3>Price history</h3>${sparkline(priceHistory(id).map(h => h.unitCost))}
       <table class="table"><tr><th>Date</th><th>Price</th><th>Qty</th><th>From</th></tr>
       ${hist.map(h => `<tr><td>${shortDate(h.date)}</td><td>${money(h.unitCost)}</td><td>${h.qty ? fmtQty(h.qty) : '—'}</td><td>${esc(h.supplier || (h.purchaseId ? '' : 'manual'))}</td></tr>`).join('')}</table>` : ''}
@@ -420,12 +605,12 @@ function sparkline(vals) {
 
 // ----- Buy (shopping list + purchases) -----
 const WHOLE_UNITS = ['each', 'dozen', 'bunch', 'head', 'bag', 'box', 'case', 'pack', 'bottle', 'can', 'jar'];
+const roundBuy = (p, raw) => WHOLE_UNITS.includes(p.unit) ? Math.ceil(raw - 0.05) || 1 : Math.ceil(raw * 4) / 4;
 function shoppingList() {
   // Perishables: top up to par every trip. Shelf-stable items: only when low or ≥25% below par.
   return S.products.filter(p => p.par > 0 && p.qty < p.par && (p.shelfLife > 0 || isLow(p) || p.par - p.qty >= p.par * 0.25))
     .map(p => {
-      const raw = p.par - p.qty;
-      const need = WHOLE_UNITS.includes(p.unit) ? Math.ceil(raw - 0.05) || 1 : Math.ceil(raw * 4) / 4;
+      const need = roundBuy(p, p.par - p.qty);
       return { p, need, est: need * (p.cost || 0) };
     })
     .sort((a, b) => (a.p.supplier || '~').localeCompare(b.p.supplier || '~') || a.p.name.localeCompare(b.p.name));
@@ -450,6 +635,8 @@ views.buy = () => {
       : empty(S.products.length ? 'All stocked up 👍 (set a <b>par</b> on items to build this list automatically)' : 'Add items in Stock first.')}
   </section>
 
+  ${planHTML()}
+
   <section class="card">
     <div class="row between"><h2>Log a purchase</h2>${!d ? `<button class="btn primary" data-action="draft-new">+ New</button>` : ''}</div>
     ${d ? draftHTML(d) : `<p class="muted small">Every purchase adds to your stock, remembers this week's price and is counted as an <b>Ingredients</b> expense.</p>`}
@@ -458,9 +645,9 @@ views.buy = () => {
   <section class="card">
     <h2>Recent purchases</h2>
     ${recent.length ? recent.map(pur => `<details class="purchase">
-      <summary><span><b>${longDate(pur.date)}</b> ${pur.supplier ? '· ' + esc(pur.supplier) : ''}<span class="muted small"> · ${pur.lines.length} items</span></span><b>${money(pur.total)}</b></summary>
+      <summary><span><b>${longDate(pur.date)}</b> ${pur.supplier ? '· ' + esc(pur.supplier) : ''}<span class="muted small"> · ${pur.lines.length} items${pur.photo ? ' · 📎' : ''}</span></span><b>${money(pur.total)}</b></summary>
       ${pur.lines.map(l => `<div class="alert-row small"><span>${esc(pname(l.productId))}</span><span>${fmtQty(l.qty)} × ${money(l.unitCost)} = ${money(l.qty * l.unitCost)}</span></div>`).join('')}
-      <div class="row end"><button class="btn sm danger-ghost" data-action="delete-purchase" data-id="${pur.id}">Delete & undo stock</button></div>
+      <div class="row end gap">${pur.photo ? `<button class="btn sm" data-action="view-photo" data-id="${pur.id}">📎 Receipt</button>` : ''}<button class="btn sm danger-ghost" data-action="delete-purchase" data-id="${pur.id}">Delete & undo stock</button></div>
     </details>`).join('') : empty('No purchases yet.')}
   </section>`;
 };
@@ -477,8 +664,39 @@ function draftHTML(d) {
       <button type="button" class="btn sm" data-action="add-product">+ New item</button>
     </div>
     <div class="alert-row total"><span>Total</span><b id="draftTotal">${money(sum(d.lines, lineTotal))}</b></div>
+    <div class="photo-box">
+      <label class="btn sm">📷 Receipt photo<input type="file" accept="image/*" capture="environment" data-change="photo" hidden></label>
+      <div class="photo-preview">${d.photo ? photoPreviewInner(d.photo) : ''}</div>
+    </div>
     <div class="row end gap"><button class="btn" data-action="draft-cancel">Cancel</button><button class="btn primary" data-action="draft-save">Save purchase</button></div>
   </div>`;
+}
+function planHTML() {
+  const hasPlates = S.menu.length && S.sales.some(s => s.plates?.length);
+  if (!hasPlates) return `<section class="card"><h2>📋 Plan ahead</h2>
+    <p class="muted small">Once you've logged a few days of sales with <b>plates sold</b>, I'll forecast your next service days and tell you exactly how much to buy and prep.</p></section>`;
+  const pl = buildPlan(ui.plan.days, ui.plan.buffer);
+  const toBuy = pl.rows.filter(r => r.buy > 0);
+  const opt = (vals, cur, fmt) => vals.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${fmt(v)}</option>`).join('');
+  return `<section class="card">
+    <h2>📋 Plan ahead</h2>
+    <p class="muted small">Forecast from what you sold on the same weekdays over the last 8 weeks.</p>
+    <div class="grid2">
+      <label class="lbl">Plan for<select data-change="plan-days">${opt([1, 2, 3, 4, 5, 6, 7, 10, 14], ui.plan.days, v => `next ${v} service day${v > 1 ? 's' : ''}`)}</select></label>
+      <label class="lbl">Safety extra<select data-change="plan-buffer">${opt([0, 10, 15, 20, 30], ui.plan.buffer, v => v ? `+${v}%` : 'none')}</select></label>
+    </div>
+    ${pl.days.map(d => { const n = sum(Object.values(d.plates)); const rev = sum(Object.entries(d.plates), ([id, c]) => c * (dish(id)?.price || 0));
+      return `<div class="alert-row small"><span>${longDate(d.date)}</span><span>${n ? `~${n} orders · ~${money(rev)}` : '<span class="muted">no history for this day</span>'}</span></div>`; }).join('')}
+    ${Object.keys(pl.byDish).length ? `<details class="purchase"><summary><span>Expected orders by dish</span><span class="muted small">show</span></summary>
+      ${Object.entries(pl.byDish).sort((a, b) => b[1] - a[1]).map(([id, n]) => `<div class="alert-row small"><span>${esc(dish(id).name)}</span><b>${n}</b></div>`).join('')}</details>` : ''}
+    ${pl.rows.length ? `<div class="table-wrap"><table class="table plan">
+      <tr><th>Ingredient</th><th>Need</th><th>Have</th><th>Buy</th></tr>
+      ${pl.rows.map(r => `<tr class="${r.buy > 0 ? 'short' : ''}"><td>${esc(r.p.name)}</td><td>${fmtQty(r.need, 1)}</td><td>${fmtQty(r.have, 1)}${r.expired ? ' <span class="badge bad">exp</span>' : ''}</td>
+        <td>${r.buy > 0 ? `<b>${fmtQty(r.buy)}</b> <span class="muted">${esc(r.p.unit)}</span>` : '<span class="pos">✓</span>'}</td></tr>`).join('')}</table></div>
+      <div class="alert-row total"><span>${toBuy.length} item${toBuy.length === 1 ? '' : 's'} to buy · expected sales ~${money(pl.revenue)}</span><b>≈ ${money(pl.cost)}</b></div>
+      <div class="row end gap"><button class="btn sm" data-action="share-plan">Share prep list</button>
+        ${toBuy.length ? `<button class="btn sm primary" data-action="draft-from-plan">Buy these</button>` : ''}</div>` : ''}
+  </section>`;
 }
 function draftLineHTML(l, i) {
   const p = P(l.productId), u = p ? esc(p.unit) : 'unit';
@@ -600,14 +818,50 @@ views.expenses = () => {
     ${cats.map(([c, v]) => `<div class="bar-row"><span>${esc(c)}</span><div class="hbar"><i style="width:${(v / max) * 100}%"></i></div><span class="small">${money(v)} · ${pct(v / total)}</span></div>`).join('')}
   </section>
   <section class="card">
-    ${list.length ? list.map(e => `<div class="item compact" ${e.purchaseId ? '' : `data-action="edit-expense" data-id="${e.id}"`}>
-      <div class="item-main"><div class="item-title">${esc(e.category)} ${e.purchaseId ? badge('from purchase') : ''}</div>
-      <div class="muted small">${longDate(e.date)}${e.note ? ' · ' + esc(e.note) : ''}</div></div><b>${money(e.amount)}</b></div>`).join('')
+    ${list.length ? list.map(e => {
+      const photoKey = e.purchaseId ? (S.purchases.find(p => p.id === e.purchaseId)?.photo ? e.purchaseId : null) : (e.photo ? e.id : null);
+      return `<div class="item compact" ${e.purchaseId ? '' : `data-action="edit-expense" data-id="${e.id}"`}>
+      <div class="item-main"><div class="item-title">${esc(e.category)} ${e.purchaseId ? badge('from purchase') : ''}${e.recurringId ? badge('🔁 auto') : ''}</div>
+      <div class="muted small">${longDate(e.date)}${e.note ? ' · ' + esc(e.note) : ''}</div></div>
+      ${photoKey ? `<button class="icon-btn" data-action="view-photo" data-id="${photoKey}" aria-label="View receipt">📎</button>` : ''}
+      <b>${money(e.amount)}</b></div>`; }).join('')
       : empty('No expenses in this period.')}
+  </section>
+
+  <section class="card">
+    <div class="row between"><div><h2>🔁 Recurring bills</h2><div class="muted small">Added to your expenses automatically when due.</div></div>
+      <button class="btn sm" data-action="add-recurring">+ Bill</button></div>
+    ${(S.recurring || []).length ? S.recurring.map(r => `<div class="item compact" data-action="edit-recurring" data-id="${r.id}">
+      <div class="item-main"><div class="item-title">${esc(r.note || r.category)}</div>
+      <div class="muted small">${esc(r.category)} · ${r.freq === 'weekly' ? 'every week' : 'every month'} · next ${shortDate(nextDue(r))}</div></div>
+      <b>${money(r.amount)}</b></div>`).join('') + `<div class="alert-row total"><span>Per month (approx.)</span><b>${money(sum(S.recurring, monthlyEquivalent))}</b></div>`
+      : empty('Rent, commissary, insurance, phone, loan payments… add them once and stop forgetting them.')}
   </section>`;
 };
+function recurringModal(id) {
+  const r = id ? S.recurring.find(x => x.id === id) : { category: 'Commissary / Parking', amount: '', note: '', freq: 'monthly', start: today() };
+  openModal(`<form data-form="recurring" class="form">
+    <h2>${id ? 'Edit recurring bill' : 'New recurring bill'}</h2>
+    <input type="hidden" name="id" value="${id || ''}">
+    <label>What is it?<input name="note" value="${esc(r.note)}" placeholder="e.g. Commissary kitchen rent" required></label>
+    <div class="grid2">
+      <label>Amount<input type="number" name="amount" step="0.01" min="0" inputmode="decimal" required value="${r.amount}"></label>
+      <label>Repeats<select name="freq"><option value="monthly" ${r.freq === 'monthly' ? 'selected' : ''}>Every month</option><option value="weekly" ${r.freq === 'weekly' ? 'selected' : ''}>Every week</option></select></label>
+      <label>Category<select name="category">${EXPENSE_CATS.map(c => `<option ${c === r.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+      <label>${id ? 'First charge was' : 'First / next charge'}<input type="date" name="start" value="${r.start}" required ${id ? 'disabled' : ''}></label>
+    </div>
+    ${id ? '' : '<p class="muted small">If the date is in the past, missed charges up to today are added too.</p>'}
+    <p class="muted small">Changing the amount affects future charges only. Deleting the bill keeps the expenses already added.</p>
+    <div class="row between actions">
+      ${id ? `<button type="button" class="btn danger-ghost" data-action="delete-recurring" data-id="${id}">Delete</button>` : '<span></span>'}
+      <div class="row gap"><button type="button" class="btn" data-action="close-modal">Cancel</button><button class="btn primary">Save</button></div>
+    </div>
+  </form>`);
+}
 function expenseModal(id) {
   const e = id ? S.expenses.find(x => x.id === id) : { date: today(), category: 'Fuel', amount: '', note: '' };
+  ui.pendingPhoto = null;
+  setTimeout(fillPhotoPreview);
   openModal(`<form data-form="expense" class="form">
     <h2>${id ? 'Edit expense' : 'New expense'}</h2>
     <input type="hidden" name="id" value="${id || ''}">
@@ -617,6 +871,7 @@ function expenseModal(id) {
     </div>
     <label>Category<select name="category">${EXPENSE_CATS.map(c => `<option ${c === e.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
     <label>Note<input name="note" value="${esc(e.note)}" placeholder="e.g. Shell station, 14 gal"></label>
+    ${photoPicker(!!e.photo, id)}
     <p class="muted small">Buying food or produce? Log it in <b>Buy</b> instead so your stock and prices update too.</p>
     <div class="row between actions">
       ${id ? `<button type="button" class="btn danger-ghost" data-action="delete-expense" data-id="${id}">Delete</button>` : '<span></span>'}
@@ -714,7 +969,19 @@ const moreViews = {
     for (let i = 0; i > -8; i--) { const r = periodRange('week', i); wk.push({ label: shortDate(r[0]), ...totals(r) }); }
     const tbl = rs => `<div class="table-wrap"><table class="table"><tr><th>Period</th><th>Sales</th><th>Ingred.</th><th>Other</th><th>Profit</th><th>Food %</th></tr>
       ${rs.map(r => `<tr><td>${r.label}</td><td>${money(r.rev)}</td><td>${money(r.ingredients)}</td><td>${money(r.exp - r.ingredients)}</td><td class="${r.profit < 0 ? 'neg' : 'pos'}">${money(r.profit)}</td><td>${pct(r.foodCost)}</td></tr>`).join('')}</table></div>`;
-    return `<section class="card"><h2>Profit & loss by month</h2>${tbl(rows)}</section>
+    const cmp = S.products.map(p => ({ p, s: supplierPrices(p.id) })).filter(x => x.s.length > 1)
+      .map(x => ({ ...x, save: (x.s[x.s.length - 1].avg - x.s[0].avg) / x.s[x.s.length - 1].avg })).sort((a, b) => b.save - a.save);
+    const swings = S.products.map(p => { const h = priceHistory(p.id).filter(x => x.date >= addDays(today(), -56)).map(x => x.unitCost);
+      return h.length > 1 ? { p, min: Math.min(...h), max: Math.max(...h) } : null; }).filter(x => x && x.min > 0 && x.max / x.min > 1.1)
+      .sort((a, b) => b.max / b.min - a.max / a.min).slice(0, 10);
+    return `${cmp.length ? `<section class="card"><h2>🏆 Where is it cheapest?</h2>
+        <p class="muted small">Average price per supplier over the last 90 days.</p>
+        ${cmp.map(x => `<div class="alert-row small"><span><b>${esc(x.p.name)}</b><br><span class="muted">${x.s.map(s => `${esc(s.supplier)} ${money(s.avg)}`).join(' · ')}</span></span>
+          <span>${esc(x.s[0].supplier)}<br><span class="pos">saves ${pct(x.save)}</span></span></div>`).join('')}</section>` : ''}
+      ${swings.length ? `<section class="card"><h2>🎢 Most volatile prices <span class="muted small">(8 weeks)</span></h2>
+        <p class="muted small">Price these into your menu carefully, or swap them in specials when they're cheap.</p>
+        ${swings.map(x => `<div class="alert-row small"><span>${esc(x.p.name)}</span><span>${money(x.min)} – ${money(x.max)}/${esc(x.p.unit)} <span class="trend up">${pct(x.max / x.min - 1)}</span></span></div>`).join('')}</section>` : ''}
+      <section class="card"><h2>Profit & loss by month</h2>${tbl(rows)}</section>
       <section class="card"><h2>By week</h2>${tbl(wk)}</section>
       <section class="card"><h2>Export to spreadsheet (CSV)</h2>
         <p class="muted small">Handy for your accountant and taxes.</p>
@@ -807,7 +1074,7 @@ const actions = {
   wipe: () => {
     if (!confirm('Erase ALL data on this device? This cannot be undone.')) return;
     if (!confirm('Really sure? Consider downloading a backup first.')) return;
-    S = emptyState(); save(); ui.draft = null; go('home'); toast('All data erased');
+    S = emptyState(); save(); photos.clear(); localStorage.removeItem('truckbook.lastBackup'); ui.draft = null; go('home'); toast('All data erased');
   },
   // stock
   'add-product': () => productModal(),
@@ -849,22 +1116,50 @@ const actions = {
     if (!lines.length) return toast('Add at least one item with a quantity');
     if (d.lines.some(l => l.productId && num(l.qty) > 0 && optNum(l.unitCost) == null) && !confirm('Some lines have no price. Save them at $0?')) return;
     const pur = { id: uid(), date: d.date || today(), supplier: (d.supplier || '').trim(), lines, total: r3(sum(lines, l => l.qty * l.unitCost)), ts: Date.now() };
-    applyPurchase(pur); save(); ui.draft = null; render(); toast(`Purchase saved · ${money(pur.total)}`);
+    applyPurchase(pur);
+    if (d.photo) { pur.photo = true; photos.set(pur.id, d.photo).catch(() => { pur.photo = false; save(); toast('⚠️ Could not save the photo'); }); }
+    save(); ui.draft = null; render(); toast(`Purchase saved · ${money(pur.total)}`);
   },
   'delete-purchase': el => {
     if (!confirm('Delete this purchase? Its quantities will be removed from stock and its expense deleted.')) return;
-    deletePurchase(el.dataset.id); save(); render(); toast('Purchase deleted');
+    deletePurchase(el.dataset.id); photos.del(el.dataset.id); save(); render(); toast('Purchase deleted');
   },
-  'share-list': async () => {
+  'share-list': () => {
     const list = shoppingList();
     const groups = {};
     list.forEach(x => (groups[x.p.supplier || 'Anywhere'] ||= []).push(x));
-    const text = `🛒 ${S.settings.name} – shopping list (${shortDate(today())})\n` + Object.entries(groups).map(([s, xs]) =>
-      `\n${s}:\n` + xs.map(x => `☐ ${x.p.name}: ${fmtQty(x.need)} ${x.p.unit}`).join('\n')).join('\n') + `\n\nEst. ${money(sum(list, x => x.est))}`;
-    try {
-      if (navigator.share) await navigator.share({ text });
-      else { await navigator.clipboard.writeText(text); toast('List copied — paste it in a text message'); }
-    } catch (e) { if (e.name !== 'AbortError') { try { await navigator.clipboard.writeText(text); toast('List copied'); } catch { alert(text); } } }
+    shareText(`🛒 ${S.settings.name} – shopping list (${shortDate(today())})\n` + Object.entries(groups).map(([s, xs]) =>
+      `\n${s}:\n` + xs.map(x => `☐ ${x.p.name}: ${fmtQty(x.need)} ${x.p.unit}`).join('\n')).join('\n') + `\n\nEst. ${money(sum(list, x => x.est))}`);
+  },
+  'draft-from-plan': () => {
+    const rows = buildPlan(ui.plan.days, ui.plan.buffer).rows.filter(r => r.buy > 0);
+    ui.draft = newDraft(rows.map(r => blankLine(r.p.id, r.buy)));
+    render(); $('#lines')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+  'share-plan': () => {
+    const pl = buildPlan(ui.plan.days, ui.plan.buffer);
+    const days = pl.days.map(d => `${longDate(d.date)}: ~${sum(Object.values(d.plates))} orders`).join('\n');
+    const dishes = Object.entries(pl.byDish).sort((a, b) => b[1] - a[1]).map(([id, n]) => `• ${dish(id).name}: ${n}`).join('\n');
+    const prep = pl.rows.map(r => `☐ ${r.p.name}: ${fmtQty(r.need)} ${r.p.unit}${r.buy > 0 ? `  (BUY ${fmtQty(r.buy)})` : ''}`).join('\n');
+    shareText(`📋 ${S.settings.name} – plan (+${ui.plan.buffer}% extra)\n\n${days}\n\nExpected orders:\n${dishes}\n\nIngredients needed:\n${prep}`);
+  },
+  // photos
+  'view-photo': async el => {
+    const src = await photos.get(el.dataset.id).catch(() => null);
+    if (!src) return toast('Photo not found on this device');
+    openModal(`<div class="photo-full"><img src="${src}" alt="Receipt"></div><div class="row end"><button class="btn" data-action="close-modal">Close</button></div>`);
+  },
+  'zoom-photo': el => { const w = window.open(); if (w) w.document.write(`<img src="${el.src}" style="max-width:100%">`); },
+  'photo-remove': el => {
+    if (el.closest('#modal')) ui.pendingPhoto = 'remove'; else if (ui.draft) ui.draft.photo = null;
+    el.closest('.photo-preview').innerHTML = '';
+  },
+  // recurring
+  'add-recurring': () => recurringModal(),
+  'edit-recurring': el => recurringModal(el.dataset.id),
+  'delete-recurring': el => {
+    if (!confirm('Stop this recurring bill? Expenses already added are kept.')) return;
+    S.recurring = S.recurring.filter(r => r.id !== el.dataset.id); save(); closeModal(); render();
   },
   // sales
   'delete-sale': el => {
@@ -875,7 +1170,7 @@ const actions = {
   // expenses
   'add-expense': () => expenseModal(),
   'edit-expense': el => expenseModal(el.dataset.id),
-  'delete-expense': el => { if (!confirm('Delete this expense?')) return; S.expenses = S.expenses.filter(x => x.id !== el.dataset.id); save(); closeModal(); render(); },
+  'delete-expense': el => { if (!confirm('Delete this expense?')) return; S.expenses = S.expenses.filter(x => x.id !== el.dataset.id); photos.del(el.dataset.id); save(); closeModal(); render(); },
   // menu
   'add-dish': () => { if (!S.products.length) { toast('Add your ingredients in Stock first'); return go('stock'); } dishModal(); },
   'edit-dish': el => dishModal(el.dataset.id),
@@ -889,11 +1184,19 @@ const actions = {
   },
   // data
   csv: el => download(`truckbook-${el.dataset.k}-${today()}.csv`, toCSV(CSV[el.dataset.k]())),
-  backup: () => {
-    download(`truckbook-backup-${today()}.json`, JSON.stringify(S, null, 1), 'application/json');
+  backup: async () => {
+    const pics = await photos.all().catch(() => ({}));
+    download(`truckbook-backup-${today()}.json`, JSON.stringify({ ...S, photos: pics }), 'application/json');
     localStorage.setItem('truckbook.lastBackup', today()); render();
+    toast(`Backup downloaded${Object.keys(pics).length ? ` (with ${Object.keys(pics).length} receipt photos)` : ''} — keep it somewhere safe`);
   },
 };
+async function shareText(text) {
+  try {
+    if (navigator.share) await navigator.share({ text });
+    else { await navigator.clipboard.writeText(text); toast('Copied — paste it in a text message'); }
+  } catch (e) { if (e.name !== 'AbortError') { try { await navigator.clipboard.writeText(text); toast('Copied'); } catch { alert(text); } } }
+}
 
 // ---------- Forms ----------
 const forms = {
@@ -916,12 +1219,23 @@ const forms = {
     if (ui.draft && !id) { const blank = ui.draft.lines.find(l => !l.productId); blank ? Object.assign(blank, blankLine(p.id)) : ui.draft.lines.push(blankLine(p.id)); }
     render(); toast(id ? 'Saved' : `Added ${p.name}`);
   },
-  expense(fd) {
+  async expense(fd) {
     const id = fd.get('id');
     const data = { date: fd.get('date'), category: fd.get('category'), amount: r3(num(fd.get('amount'))), note: (fd.get('note') || '').trim() };
-    if (id) Object.assign(S.expenses.find(x => x.id === id), data);
-    else S.expenses.push({ id: uid(), ts: Date.now(), ...data });
+    let e = id && S.expenses.find(x => x.id === id);
+    if (e) Object.assign(e, data);
+    else { e = { id: uid(), ts: Date.now(), ...data }; S.expenses.push(e); }
+    const ph = await commitPhoto(e.id);
+    if (ph !== undefined) e.photo = ph;
     save(); closeModal(); render(); toast('Expense saved');
+  },
+  recurring(fd) {
+    const id = fd.get('id');
+    const data = { note: fd.get('note').trim(), amount: r3(num(fd.get('amount'))), freq: fd.get('freq'), category: fd.get('category') };
+    if (id) Object.assign(S.recurring.find(r => r.id === id), data);
+    else (S.recurring ||= []).push({ id: uid(), start: fd.get('start') || today(), lastRun: null, ...data });
+    const added = runRecurring();
+    save(); closeModal(); render(); toast(added ? `Saved · ${added} charge${added > 1 ? 's' : ''} added` : 'Recurring bill saved');
   },
   sale(fd, form) {
     const s = readSaleForm(form);
@@ -949,19 +1263,35 @@ const forms = {
 // ---------- Change handlers ----------
 const changes = {
   'set-qty': el => { const p = P(el.dataset.id); if (!p) return; p.qty = r3(Math.max(0, num(el.value))); save(); refreshInv(); },
+  'plan-days': el => { ui.plan.days = +el.value; render(); },
+  'plan-buffer': el => { ui.plan.buffer = +el.value; render(); },
+  photo: async el => {
+    const f = el.files[0]; if (!f) return;
+    try {
+      const data = await compressImage(f);
+      if (el.closest('#modal')) ui.pendingPhoto = data; else if (ui.draft) ui.draft.photo = data;
+      el.closest('.photo-box').querySelector('.photo-preview').innerHTML = photoPreviewInner(data);
+    } catch { toast('Could not read that photo'); }
+    el.value = '';
+  },
   import: el => {
     const f = el.files[0]; if (!f) return;
     const rd = new FileReader();
-    rd.onload = () => {
-      try {
-        const data = JSON.parse(rd.result);
-        if (!data || !Array.isArray(data.products)) throw new Error('bad');
-        if (!confirm('Replace current data with this backup?')) return;
-        S = Object.assign(emptyState(), data); S.settings = Object.assign(emptyState().settings, data.settings);
-        save(); ui.draft = null; render(); toast('Backup restored');
-      } catch { toast('That file is not a TruckBook backup'); }
+    rd.onload = async () => {
+      let data;
+      try { data = JSON.parse(rd.result); if (!data || !Array.isArray(data.products)) throw new Error('bad'); }
+      catch { return toast('That file is not a TruckBook backup'); }
+      if (!confirm('Replace current data with this backup?')) return;
+      const pics = data.photos || {}; delete data.photos;
+      S = Object.assign(emptyState(), data); S.settings = Object.assign(emptyState().settings, data.settings);
+      save(); ui.draft = null;
+      await photos.clear();
+      for (const [k, v] of Object.entries(pics)) await photos.set(k, v).catch(() => {});
+      localStorage.setItem('truckbook.lastBackup', today());
+      render(); toast('Backup restored');
     };
     rd.readAsText(f);
+    el.value = '';
   },
 };
 
@@ -1061,7 +1391,9 @@ function loadSample() {
         if (lastTrip && k === 'squid') return; // skipped → shows up as an expiring/expired alert
         const swingPct = it.category === 'produce' ? 0.35 : it.category === 'seafood' ? 0.1 : 0.03;
         const price = idx === 0 ? base[k] : Math.round(base[k] * (1 - swingPct / 2 + rnd() * swingPct) * 100) / 100;
-        (bySup[it.supplier] ||= []).push({ productId: it.id, qty: Math.ceil(need * 4) / 4, unitCost: price });
+        // some weeks the produce staples come from Restaurant Depot instead (a bit pricier) → supplier comparison
+        const alt = idx % 3 === 1 && ['avo', 'lime', 'tom', 'onion'].includes(k);
+        (bySup[alt ? DEP : it.supplier] ||= []).push({ productId: it.id, qty: Math.ceil(need * 4) / 4, unitCost: alt ? Math.round(price * 1.12 * 100) / 100 : price });
       });
       Object.entries(bySup).forEach(([sup, lines]) => applyPurchase({ id: uid(), date, supplier: sup, lines, total: r3(sum(lines, l => l.qty * l.unitCost)), ts: Date.now() }));
     }
@@ -1078,10 +1410,12 @@ function loadSample() {
     if (off < 0 && wd === 4) S.expenses.push({ id: uid(), date, category: 'Propane', amount: 38, note: 'Tank refill', ts: Date.now() });
     if (off < 0 && wd === 0) S.expenses.push({ id: uid(), date, category: 'Card / App fees', amount: r3(sum(S.sales.filter(s => daysBetween(s.date, date) < 7 && daysBetween(s.date, date) >= 0), s => s.card) * 0.029), note: 'Weekly processing fees', ts: Date.now() });
   }
-  [-40, -10].forEach(o => {
-    S.expenses.push({ id: uid(), date: addDays(t0, o), category: 'Commissary / Parking', amount: 450, note: 'Monthly commissary kitchen', ts: Date.now() });
-    S.expenses.push({ id: uid(), date: addDays(t0, o + 2), category: 'Insurance', amount: 135, note: 'Monthly liability policy', ts: Date.now() });
-  });
+  S.recurring = [
+    { id: uid(), note: 'Commissary kitchen', category: 'Commissary / Parking', amount: 450, freq: 'monthly', start: addDays(t0, -40), lastRun: null },
+    { id: uid(), note: 'Liability insurance', category: 'Insurance', amount: 135, freq: 'monthly', start: addDays(t0, -38), lastRun: null },
+    { id: uid(), note: 'Phone & POS plan', category: 'Other', amount: 65, freq: 'monthly', start: addDays(t0, -25), lastRun: null },
+  ];
+  runRecurring();
   S.expenses.push({ id: uid(), date: addDays(t0, -33), category: 'Permits & Licenses', amount: 180, note: 'Health permit renewal', ts: Date.now() });
   S.expenses.push({ id: uid(), date: addDays(t0, -19), category: 'Repairs & Maintenance', amount: 95, note: 'Fryer thermostat', ts: Date.now() });
   S.expenses.push({ id: uid(), date: addDays(t0, -4), category: 'Event fees', amount: 75, note: 'Brewery Row spot', ts: Date.now() });
@@ -1092,7 +1426,9 @@ function loadSample() {
 }
 
 // ---------- Boot ----------
+runRecurring();
 render();
+document.addEventListener('visibilitychange', () => { if (!document.hidden && runRecurring()) render(); });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
