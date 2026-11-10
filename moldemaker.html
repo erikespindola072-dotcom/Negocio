@@ -86,7 +86,7 @@ label.check:has(input:checked){border-color:var(--ok)}
   <header class="flex flex-wrap items-end justify-between gap-3 mb-4">
     <div>
       <h1 class="text-3xl font-extrabold leading-tight">Molde<span style="color:var(--accent)">Maker</span></h1>
-      <p class="hint" style="font-size:14px">Contramolde conforme en PETG que sigue la forma de tu master, para colar silicona platino sobre tu master impreso y luego verter velas.</p>
+      <p class="hint" style="font-size:14px">Contramolde conforme en PETG que sigue la forma de tu master, para colar silicona platino sobre tu master impreso.</p>
     </div>
     <div class="flex gap-2 flex-wrap items-center">
       <span id="engineState" class="hint mono">Cargando motor de booleanas…</span>
@@ -106,7 +106,7 @@ label.check:has(input:checked){border-color:var(--ok)}
         </label>
         <div class="flex flex-col gap-2"><span class="hint">O prueba un ejemplo:</span>
           <div class="seg" id="samples">
-            <button type="button" data-sample="star" aria-pressed="false">Vela estrella</button>
+            <button type="button" data-sample="star" aria-pressed="false">Figura estrella</button>
             <button type="button" data-sample="sphere" aria-pressed="false">Esfera Ø30 mm</button>
           </div></div>
         <div class="stats" id="fileStats">
@@ -121,7 +121,6 @@ label.check:has(input:checked){border-color:var(--ok)}
       <section class="panel flex flex-col gap-4" aria-labelledby="h-mat">
         <div class="step">Paso 2</div>
         <h2 id="h-mat" class="text-lg font-bold">Materiales</h2>
-        <label class="switch" for="candleMode"><span><span class="label">Modo Vela</span><br><span class="hint">Escala por cera, embudo grande, checklist</span></span><input id="candleMode" type="checkbox" checked></label>
         <div class="flex flex-col gap-2">
           <span class="label">Material del master</span>
           <div class="seg" data-group="master">
@@ -147,15 +146,6 @@ label.check:has(input:checked){border-color:var(--ok)}
           </div>
           <span class="hint" id="silNote"></span>
         </div>
-        <div class="flex flex-col gap-2" id="waxBlock">
-          <span class="label">Cera</span>
-          <div class="seg" data-group="wax">
-            <button type="button" data-v="SOY" aria-pressed="true">Cera de Soya</button>
-            <button type="button" data-v="PAR" aria-pressed="false">Parafina</button>
-            <button type="button" data-v="COCO" aria-pressed="false">Cera de Coco</button>
-          </div>
-          <span class="hint" id="waxNote"></span>
-        </div>
       </section>
 
       <section class="panel flex flex-col gap-4" aria-labelledby="h-dim">
@@ -175,16 +165,15 @@ label.check:has(input:checked){border-color:var(--ok)}
 
       <section class="panel flex flex-col gap-4" aria-labelledby="h-wick">
         <div class="step">Paso 4</div>
-        <h2 id="h-wick" class="text-lg font-bold">Mecha y embudo</h2>
-        <label class="switch" for="wick"><span class="label">Canal de mecha Ø3 mm</span><input id="wick" type="checkbox" checked></label>
-        <div class="range-row"><label class="label" for="wickX">Posición mecha X</label><output id="wickXOut" for="wickX"></output>
+        <h2 id="h-wick" class="text-lg font-bold">Boca de vertido</h2>
+        <div class="range-row"><label class="label" for="wickX">Posición de la boca X</label><output id="wickXOut" for="wickX"></output>
           <input id="wickX" type="range" min="-50" max="50" step="0.5" value="0"></div>
-        <div class="range-row"><label class="label" for="wickY">Posición mecha Y</label><output id="wickYOut" for="wickY"></output>
+        <div class="range-row"><label class="label" for="wickY">Posición de la boca Y</label><output id="wickYOut" for="wickY"></output>
           <input id="wickY" type="range" min="-50" max="50" step="0.5" value="0"></div>
-        <button type="button" class="btn btn-ghost" id="pickWick" aria-pressed="false">Colocar mecha con clic en el modelo</button>
-        <div class="range-row"><label class="label" for="funnel">Diámetro reservorio / embudo</label><output id="funnelOut" for="funnel"></output>
+        <button type="button" class="btn btn-ghost" id="pickWick" aria-pressed="false">Colocar la boca con clic en el modelo</button>
+        <div class="range-row"><label class="label" for="funnel">Diámetro de la boca</label><output id="funnelOut" for="funnel"></output>
           <input id="funnel" type="range" min="15" max="20" step="0.5" value="18"></div>
-        <p class="hint">El reservorio es un tapón cilíndrico que se pega en la parte alta del master. Atraviesa la tapa del Shell B, cuelga el master a la altura correcta y deja en la silicona un depósito para el segundo vertido de cera.</p>
+        <p class="hint">La boca es un tapón cilíndrico que pegas arriba del master. Cuelga el master dentro del shell y deja la abertura del molde de silicona.</p>
       </section>
 
       <button type="button" class="btn btn-primary" id="genBtn" disabled>Generar Molde</button>
@@ -199,7 +188,7 @@ label.check:has(input:checked){border-color:var(--ok)}
           <span><i class="dot" style="background:#e58fb0"></i>Silicona</span>
           <span><i class="dot" style="background:#4aa39c"></i>Shell A</span>
           <span><i class="dot" style="background:#6f86c9"></i>Shell B</span>
-          <span><i class="dot" style="background:#d6402f"></i>Mecha</span>
+          <span><i class="dot" style="background:#d6402f"></i>Centro de la boca</span>
         </div>
         <div class="busy" id="busy" hidden>Calculando booleanas…</div>
       </div>
@@ -220,7 +209,6 @@ label.check:has(input:checked){border-color:var(--ok)}
           <div class="stat"><small>Ahorro</small><b id="rsSave">—</b></div>
           <div class="stat"><small>Shell con brida</small><b id="rsOuter">—</b></div>
           <div class="stat"><small>Shell A+B aprox.</small><b id="rsShell">—</b></div>
-          <div class="stat"><small>Cera aprox.</small><b id="rsWax">—</b></div>
           <div class="stat"><small>Escala master</small><b id="rsScale">—</b></div>
         </div>
         <p class="hint">Silicona = volumen OUTER − volumen del master. Densidad 1,1 g/ml. La caja es la del método anterior con el mismo grosor por lado. <span id="rsMethod"></span></p>
@@ -244,7 +232,7 @@ label.check:has(input:checked){border-color:var(--ok)}
         <p class="hint" id="exportState">Genera el molde para habilitar la descarga.</p>
         <button type="button" class="btn btn-primary exp" data-file="A" disabled>Descargar Shell_A.stl</button>
         <button type="button" class="btn btn-primary exp" data-file="B" disabled>Descargar Shell_B.stl</button>
-        <button type="button" class="btn btn-ghost exp" data-file="plug" disabled>Tapón reservorio (.stl)</button>
+        <button type="button" class="btn btn-ghost exp" data-file="plug" disabled>Tapón de la boca (.stl)</button>
         <button type="button" class="btn btn-ghost exp" data-file="master" disabled>Master escalado (.stl)</button>
         <button type="button" class="btn btn-ghost exp" data-file="all" disabled>Todo en un .zip</button>
         <p class="hint">STL binario en mm. Shell B se exporta volteado (tapa sobre la cama) para imprimir sin soportes. Dentro de Claude los STL se entregan en un .zip.</p>
@@ -252,16 +240,12 @@ label.check:has(input:checked){border-color:var(--ok)}
       </section>
 
       <section class="panel flex flex-col gap-3" aria-labelledby="h-how">
-        <h2 id="h-how" class="text-lg font-bold">Cómo hacer la vela</h2>
+        <h2 id="h-how" class="text-lg font-bold">Cómo hacer el molde</h2>
         <ol class="steps">
           <li>Imprime Shell A y Shell B en PETG (3–4 perímetros, 20 % relleno).</li>
-          <li>Pega el tapón reservorio al master, colócalo dentro y cierra A + B con las llaves y 4 tornillos M3 (o prensas) en la brida.</li>
+          <li>Pega el tapón de la boca al master, colócalo dentro y cierra A + B con las llaves y 4 tornillos M3 (o prensas) en la brida.</li>
           <li>Vierte silicona platino por el orificio de colada Ø10 hasta que salga por el respiradero. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
-          <li>Abre el shell, corta la silicona en zigzag por un lado, saca el master y vuelve a meter el molde de silicona en el shell.</li>
-          <li>Pasa la mecha por el canal de Ø3 mm y céntrala arriba.</li>
-          <li>Vierte la cera a 80 °C por el reservorio.</li>
-          <li>Segundo vertido a los 30 min para llenar el hundimiento.</li>
-          <li>Desmolda pelando la silicona, sin forzar la cera.</li>
+          <li>Abre el shell, corta la silicona en zigzag por un lado y saca el master. Tu molde de silicona está listo.</li>
         </ol>
       </section>
     </div>
@@ -291,19 +275,14 @@ const $ = (id) => document.getElementById(id);
 /* ---------- Datos de materiales ---------- */
 const MASTER = {
   PLA:  { note: 'PLA: se lija fácil, se deforma a 60 °C.' },
-  PETG: { note: 'PETG: resiste calor hasta 80 °C, más difícil de lijar.' },
+  PETG: { note: 'PETG: resiste más calor, más difícil de lijar.' },
 };
 const SILICONE = {
-  P15: { name: 'Platino Shore 15', scale: 1.001, clearance: 0.4, note: 'Blanda y resistente al calor. Recomendada para velas.' },
+  P15: { name: 'Platino Shore 15', scale: 1.001, clearance: 0.4, note: 'Blanda y resistente al calor.' },
   P10: { name: 'Platino Shore 10', scale: 1.001, clearance: 0.4, note: 'Muy blanda, ideal para figuras con detalle profundo.' },
-  T30: { name: 'Estaño Shore 30', scale: 1.008, clearance: 0.4, note: 'Más rígida y encoge más. Menos resistente al calor de la cera.' },
+  T30: { name: 'Estaño Shore 30', scale: 1.008, clearance: 0.4, note: 'Más rígida y encoge un poco más.' },
 };
-const WAX = {
-  SOY:  { name: 'Cera de Soya', scale: 1.03 },
-  PAR:  { name: 'Parafina', scale: 1.05 },
-  COCO: { name: 'Cera de Coco', scale: 1.02 },
-};
-const state = { master: 'PLA', shellMat: 'PETG', silicone: 'P15', wax: 'SOY' };
+const state = { master: 'PLA', shellMat: 'PETG', silicone: 'P15' };
 
 /* ---------- Motor manifold-3d (WASM incrustado) ---------- */
 let M = null;
@@ -453,15 +432,13 @@ function frameCamera() {
 
 /* ---------- Parámetros ---------- */
 function params() {
-  const candle = $('candleMode').checked;
-  const sil = SILICONE[state.silicone];
-  const scale = sil.scale * (candle ? WAX[state.wax].scale : 1);
+  const scale = SILICONE[state.silicone].scale;
   return {
-    candle, scale,
+    scale,
     wall: +$('wall').value, sil: +$('gap').value, clear: +$('clear').value,
-    partH: +$('part').value, keys: $('keys').checked, wick: $('wick').checked,
+    partH: +$('part').value, keys: $('keys').checked,
     wx: +$('wickX').value, wy: +$('wickY').value,
-    funnel: candle ? +$('funnel').value : 12,
+    funnel: +$('funnel').value,
   };
 }
 // Caja del master escalado (escala sobre el origen) — solo para medidas y comparación
@@ -494,7 +471,7 @@ function updatePreview() {
     plane.position.set((L.mMin.x + L.mMax.x) / 2, (L.mMin.y + L.mMax.y) / 2, L.zp);
     groups.preview.add(plane);
   }
-  if (p.wick) {
+  {
     const e = +$('explode').value, ext = p.sil + p.wall;
     const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(L.wx, L.wy, L.mMin.z - ext - 10 - e / 2), new THREE.Vector3(L.wx, L.wy, L.mMax.z + ext + 25 + e / 2)]);
     groups.preview.add(new THREE.Line(g, matWick));
@@ -742,12 +719,6 @@ function generate() {
       B = keep(B.subtract(keep(cylZ(r, z0 + 0.5, seat + 1, x, y, 32))));
     }
 
-    // 9) Canal de mecha Ø3 a través de ambas mitades y del tapón
-    if (p.wick) {
-      const w = keep(cylZ(1.5, L.mMin.z - p.sil - p.wall - 10, seat + 10, L.wx, L.wy, 24));
-      A = keep(A.subtract(w)); B = keep(B.subtract(w)); plug = keep(plug.subtract(w));
-    }
-
     // 10) Verificaciones: cavidad real y no un bloque
     if (A.isEmpty() || B.isEmpty()) throw new Error('Una de las mitades quedó vacía. Mueve la línea de partición.');
     const vOuter = outer.volume(), vShellOuter = shellOuter.volume();
@@ -763,7 +734,7 @@ function generate() {
     const bb = new THREE.Box3().setFromBufferAttribute(out.A.getAttribute('position')).union(new THREE.Box3().setFromBufferAttribute(out.B.getAttribute('position')));
     out.stats = {
       outer: bb.getSize(new THREE.Vector3()), scale: p.scale, zp,
-      silMl: (vOuter - vMaster) / 1000, boxMl: (boxVol - vMaster) / 1000, waxMl: vMaster / 1000,
+      silMl: (vOuter - vMaster) / 1000, boxMl: (boxVol - vMaster) / 1000,
       shellMl: (A.volume() + B.volume()) / 1000,
     };
     out.ok = true;
@@ -798,7 +769,6 @@ function showResult() {
   const save = s.boxMl > 0 ? (1 - s.silMl / s.boxMl) * 100 : 0;
   $('rsSave').textContent = `${fmt(save, 0)} %`;
   $('rsSave').style.color = save > 20 ? 'var(--ok)' : 'var(--warn)';
-  $('rsWax').textContent = `${fmt(s.waxMl, 0)} ml · ${fmt(s.waxMl * 0.9, 0)} g`;
   $('rsScale').textContent = '×' + s.scale.toFixed(4);
   $('rsShell').textContent = `${fmt(s.shellMl * 1.27, 0)} g PETG`;
   $('rsMethod').textContent = METHOD_TXT[result.method];
@@ -818,15 +788,14 @@ function applyExplode() {
 /* ---------- Invalidación y exportación ---------- */
 function invalidate() {
   if (result) { result = null; clearGroup(groups.A); clearGroup(groups.B); showMaster(); $('genMsgs').innerHTML = ''; $('genMsgs').append(note('warn', 'Cambiaste un parámetro. Vuelve a <b>Generar Molde</b>.')); }
-  for (const id of ['rsOuter', 'rsSil', 'rsSilW', 'rsBox', 'rsSave', 'rsShell', 'rsWax', 'rsMethod']) $(id).textContent = id === 'rsMethod' ? '' : '—';
+  for (const id of ['rsOuter', 'rsSil', 'rsSilW', 'rsBox', 'rsSave', 'rsShell', 'rsMethod']) $(id).textContent = id === 'rsMethod' ? '' : '—';
   if (model) $('rsScale').textContent = '×' + params().scale.toFixed(4);
   updatePreview(); refreshExport();
 }
 function refreshExport() {
-  const candle = $('candleMode').checked;
   const allPrep = [...document.querySelectorAll('.prep')].every(c => c.checked);
   const ready = !!(result && result.ok);
-  const enabled = ready && (!candle || allPrep);
+  const enabled = ready && allPrep;
   document.querySelectorAll('.exp').forEach(b => b.disabled = !enabled);
   const st = $('exportState');
   if (!ready) st.textContent = 'Genera el molde para habilitar la descarga.';
@@ -918,18 +887,11 @@ function updateOutputs() {
   $('explodeOut').textContent = (+$('explode').value) + ' mm';
 }
 function updateNotes() {
-  const candle = $('candleMode').checked;
   $('masterNote').textContent = MASTER[state.master].note + ' Holgura 0,4 mm para compensar ancho de extrusión y líneas de capa.';
   const s = SILICONE[state.silicone];
   $('silNote').textContent = `${s.note} Escala ×${s.scale}, holgura ${s.clearance} mm.`;
-  const w = WAX[state.wax];
-  $('waxNote').textContent = candle ? `Escala ×${w.scale}: la cera encoge más que la silicona, el master se agranda antes de generar.` : 'Modo Vela apagado: no se aplica escala de cera.';
-  $('waxBlock').style.opacity = candle ? 1 : 0.5;
-  $('funnel').disabled = !candle;
   const sw = $('shellMatWarn'); sw.innerHTML = '';
-  if (candle && state.shellMat === 'PLA') sw.append(note('bad', '<b>Usa PETG para velas.</b> La cera caliente a 80 °C deforma el PLA (se ablanda a 60 °C).'));
-  else if (state.shellMat === 'PETG') sw.append(note('ok', 'PETG soporta la cera a 80 °C sin deformarse.'));
-  if (candle && state.silicone === 'T30') sw.append(note('warn', 'Para velas se recomienda silicona Platino Shore 10–15.'));
+  sw.append(note('ok', state.shellMat === 'PETG' ? 'PETG: rígido y resistente, recomendado para el shell.' : 'PLA: también sirve para colar la silicona.'));
   refreshExport();
 }
 document.querySelectorAll('.seg').forEach(seg => {
@@ -941,22 +903,13 @@ document.querySelectorAll('.seg').forEach(seg => {
     if (key === 'silicone') { $('clear').value = SILICONE[state.silicone].clearance; updateOutputs(); }
     if (key === 'master') { $('clear').value = 0.4; updateOutputs(); }
     updateNotes();
-    if (key === 'silicone' || key === 'wax') { showMaster(); invalidate(); }
+    if (key === 'silicone') { showMaster(); invalidate(); }
   });
-});
-$('candleMode').addEventListener('change', () => {
-  if ($('candleMode').checked) {
-    // valores por defecto de vela
-    state.shellMat = 'PETG'; state.silicone = 'P15';
-    document.querySelectorAll('[data-group="shellMat"] button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === 'PETG')));
-    document.querySelectorAll('[data-group="silicone"] button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === 'P15')));
-  }
-  updateNotes(); showMaster(); invalidate();
 });
 for (const id of ['wall', 'gap', 'clear', 'part', 'wickX', 'wickY', 'funnel']) {
   $(id).addEventListener('input', () => { updateOutputs(); invalidate(); });
 }
-for (const id of ['keys', 'wick']) $(id).addEventListener('change', invalidate);
+for (const id of ['keys']) $(id).addEventListener('change', invalidate);
 $('explode').addEventListener('input', () => { updateOutputs(); applyExplode(); });
 $('showMaster').addEventListener('change', () => groups.master.visible = $('showMaster').checked);
 $('showShell').addEventListener('change', syncVisibility);
@@ -971,7 +924,7 @@ document.querySelectorAll('.exp').forEach(b => b.addEventListener('click', () =>
 $('pickWick').addEventListener('click', () => {
   pickMode = !pickMode;
   $('pickWick').setAttribute('aria-pressed', String(pickMode));
-  $('pickWick').textContent = pickMode ? 'Haz clic sobre el master…' : 'Colocar mecha con clic en el modelo';
+  $('pickWick').textContent = pickMode ? 'Haz clic sobre el master…' : 'Colocar la boca con clic en el modelo';
   $('pickWick').style.borderColor = pickMode ? 'var(--accent)' : '';
 });
 let downAt = null;
@@ -986,7 +939,7 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   if (!hit) return;
   const s = params().scale;
   $('wickX').value = (hit.point.x / s).toFixed(1); $('wickY').value = (hit.point.y / s).toFixed(1);
-  pickMode = false; $('pickWick').setAttribute('aria-pressed', 'false'); $('pickWick').textContent = 'Colocar mecha con clic en el modelo'; $('pickWick').style.borderColor = '';
+  pickMode = false; $('pickWick').setAttribute('aria-pressed', 'false'); $('pickWick').textContent = 'Colocar la boca con clic en el modelo'; $('pickWick').style.borderColor = '';
   updateOutputs(); invalidate();
 });
 
@@ -1021,7 +974,6 @@ $('genBtn').addEventListener('click', async () => {
   msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Partición a ${fmt(r.stats.zp - layout(params()).mMin.z, 1)} mm de la base del master. ${r.keys} llaves y ${r.screws} agujeros para tornillos en la brida.`));
   if (r.method === 'escala') msgs.append(note('warn', '<b>Se usó el método de respaldo:</b> el offset por normales falló, la silicona se calculó escalando el modelo desde su centroide y suavizando. El grosor no es uniforme; revisa la vista previa.'));
   for (const w of r.warnings) msgs.append(note('warn', w));
-  if ($('candleMode').checked && state.shellMat === 'PLA') msgs.append(note('warn', 'Recuerda: imprime este shell en <b>PETG</b>, no en PLA.'));
 });
 
 /* ---------- Arranque ---------- */
@@ -1047,7 +999,7 @@ function loadSample(kind) {
   }
   const g = manifoldToGeometry(man); man.delete();
   const dv = exporter.parse(new THREE.Mesh(g), { binary: true });
-  loadBuffer(dv.buffer, kind === 'sphere' ? 'esfera_30mm.stl' : 'vela_estrella.stl', true);
+  loadBuffer(dv.buffer, kind === 'sphere' ? 'esfera_30mm.stl' : 'figura_estrella.stl', true);
   document.querySelectorAll('#samples button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sample === kind)));
 }
 $('samples').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && M) loadSample(b.dataset.sample); });
