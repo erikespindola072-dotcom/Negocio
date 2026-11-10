@@ -167,7 +167,7 @@ label.check:has(input:checked){border-color:var(--ok)}
       <section class="panel flex flex-col gap-4" aria-labelledby="h-dim">
         <div class="step">Paso 3</div>
         <h2 id="h-dim" class="text-lg font-bold">Molde conforme</h2>
-        <p class="hint">La silicona y el shell siguen la forma del master. El master se pega sobre una base plana, el shell se abre en dos mitades con un corte vertical y la silicona se vierte por arriba.</p>
+        <p class="hint">El master se pega sobre un disco de base y queda de pie. El molde son dos bloques con corte vertical: por fuera planos, por dentro con la cavidad ajustada a la forma. La silicona entra por el embudo de arriba.</p>
         <div class="range-row"><label class="label" for="wall">Grosor de pared</label><output id="wallOut" for="wall"></output>
           <input id="wall" type="range" min="2" max="4" step="0.1" value="2.5"></div>
         <div class="range-row"><label class="label" for="gap">Grosor de silicona</label><output id="gapOut" for="gap"></output>
@@ -183,7 +183,9 @@ label.check:has(input:checked){border-color:var(--ok)}
         </div>
         <div class="range-row"><label class="label" for="part">Posición del corte (desde el centro)</label><output id="partOut" for="part"></output>
           <input id="part" type="range" min="-50" max="50" step="0.5" value="0"></div>
-        <label class="switch" for="keys"><span><span class="label">Llaves de registro (4 × Ø5 mm)</span><br><span class="hint">En la brida plana de 12 mm, que se cierra con pinzas sujetadocumentos</span></span><input id="keys" type="checkbox" checked></label>
+        <div class="range-row"><label class="label" for="baseH">Grosor del disco de base</label><output id="baseHOut" for="baseH"></output>
+          <input id="baseH" type="range" min="3" max="10" step="0.5" value="5"></div>
+        <label class="switch" for="keys"><span><span class="label">Llaves de registro (4 esféricas Ø8 mm)</span><br><span class="hint">En las esquinas de la cara del corte. El molde se cierra con pinzas sujetadocumentos en las pestañas laterales.</span></span><input id="keys" type="checkbox" checked></label>
       </section>
 
       <button type="button" class="btn btn-primary" id="genBtn" disabled>Generar Molde</button>
@@ -198,7 +200,7 @@ label.check:has(input:checked){border-color:var(--ok)}
           <span><i class="dot" style="background:#e58fb0"></i>Silicona</span>
           <span><i class="dot" style="background:#4aa39c"></i>Shell A</span>
           <span><i class="dot" style="background:#6f86c9"></i>Shell B</span>
-          <span><i class="dot" style="background:#9aa3a6"></i>Base</span>
+          <span><i class="dot" style="background:#9aa3a6"></i>Base del master</span>
         </div>
         <div class="busy" id="busy" hidden>Calculando booleanas…</div>
       </div>
@@ -217,8 +219,8 @@ label.check:has(input:checked){border-color:var(--ok)}
           <div class="stat"><small>Peso estimado de silicona</small><b id="rsSilW">—</b></div>
           <div class="stat"><small>Con caja rectangular</small><b id="rsBox">—</b></div>
           <div class="stat"><small>Ahorro</small><b id="rsSave">—</b></div>
-          <div class="stat"><small>Shell con brida</small><b id="rsOuter">—</b></div>
-          <div class="stat"><small>PETG (A + B + base)</small><b id="rsShell">—</b></div>
+          <div class="stat"><small>Molde armado</small><b id="rsOuter">—</b></div>
+          <div class="stat"><small>PETG (molde + base)</small><b id="rsShell">—</b></div>
           <div class="stat"><small>Escala master</small><b id="rsScale">—</b></div>
         </div>
         <p class="hint">Silicona = volumen OUTER − volumen del master. Densidad 1,1 g/ml. La caja es la del método anterior con el mismo grosor por lado. <span id="rsMethod"></span></p>
@@ -242,21 +244,21 @@ label.check:has(input:checked){border-color:var(--ok)}
         <p class="hint" id="exportState">Genera el molde para habilitar la descarga.</p>
         <button type="button" class="btn btn-primary exp" data-file="A" disabled>Descargar Shell_A.stl</button>
         <button type="button" class="btn btn-primary exp" data-file="B" disabled>Descargar Shell_B.stl</button>
-        <button type="button" class="btn btn-primary exp" data-file="base" disabled>Descargar Base.stl</button>
+        <button type="button" class="btn btn-primary exp" data-file="base" disabled>Descargar Base_master.stl</button>
         <button type="button" class="btn btn-ghost exp" data-file="master" disabled>Master escalado (.stl)</button>
         <button type="button" class="btn btn-ghost exp" data-file="all" disabled>Todo en un .zip</button>
-        <p class="hint">STL binario en mm. Shell A y B se exportan acostados sobre la cara del corte; la base, tal cual. Dentro de Claude los STL se entregan en un .zip.</p>
+        <p class="hint">STL binario en mm. Shell A y B se exportan acostados sobre la cara del corte; la base del master, tal cual. Dentro de Claude los STL se entregan en un .zip.</p>
         <div id="expMsgs" class="flex flex-col gap-2"></div>
       </section>
 
       <section class="panel flex flex-col gap-3" aria-labelledby="h-how">
         <h2 id="h-how" class="text-lg font-bold">Cómo hacer el molde</h2>
         <ol class="steps">
-          <li>Imprime Shell A, Shell B y la Base en PETG (3–4 perímetros, 20 % relleno).</li>
-          <li>Pega el master sobre la base, dentro de la marca de centrado.</li>
-          <li>Une A + B con las llaves, sujeta la brida con 6–8 pinzas sujetadocumentos de 25 mm o más y asiéntalas dentro del borde de la base. Sella la junta con plastilina si hace falta.</li>
-          <li>Vierte la silicona por arriba, despacio y por un costado, hasta el borde. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
-          <li>Quita las pinzas, abre A y B, despega la base y saca el master. El hueco donde estaba pegado a la base es la boca de tu molde de silicona.</li>
+          <li>Imprime Shell A, Shell B y la base del master en PETG (3–4 perímetros, 20 % relleno).</li>
+          <li>Pega el master sobre el disco de base, dentro de la marca de centrado.</li>
+          <li>Pon el master con su disco en una mitad (el disco entra en su hueco de abajo), cierra con la otra mitad usando las llaves y sujeta las pestañas con pinzas sujetadocumentos.</li>
+          <li>Para el molde sobre la mesa y vierte la silicona por el embudo de arriba hasta que salga por el respiradero. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
+          <li>Quita las pinzas, abre el molde y saca la silicona con el master; córtala en zigzag si hace falta para sacarlo. Donde estaba el disco queda la boca de tu molde.</li>
         </ol>
       </section>
     </div>
@@ -459,7 +461,7 @@ function params() {
   return {
     scale,
     wall: +$('wall').value, sil: +$('gap').value, clear: +$('clear').value,
-    part: +$('part').value, keys: $('keys').checked,
+    part: +$('part').value, keys: $('keys').checked, baseH: +$('baseH').value,
   };
 }
 // Caja del master escalado (escala sobre el origen) — solo para medidas y comparación
@@ -642,12 +644,11 @@ function makeDistanceField(master, diag) {
 }
 
 /* ---------- Generación del molde conforme (manifold-3d) ---------- */
-// Cilindro a lo largo de la normal del corte (X o Y), de s0 a s1 sobre ese eje, centrado en (u, z) del plano
-function cylN(axis, r, s0, s1, u, z, seg = 32) {
-  const c = M.Manifold.cylinder(s1 - s0, r, r, seg).translate([0, 0, s0]);
-  const rc = c.rotate(axis === 'X' ? [0, 90, 0] : [-90, 0, 0]); c.delete();
-  const t = rc.translate(axis === 'X' ? [0, u, z] : [u, 0, z]); rc.delete();
-  return t;
+function cylZ(r, z0, z1, x, y, seg = 48) {
+  return M.Manifold.cylinder(z1 - z0, r, r, seg).translate([x, y, z0]);
+}
+function boxM(min, max) {
+  return M.Manifold.cube([max[0] - min[0], max[1] - min[1], max[2] - min[2]]).translate(min);
 }
 function extremePoint(polys, dx, dy) {
   let best = null, bd = -Infinity;
@@ -657,15 +658,13 @@ function extremePoint(polys, dx, dy) {
   }
   return best;
 }
-// Solo los contornos exteriores (sin huecos) de una sección
-function outerContours(polys) {
-  return polys.filter(poly => {
-    let a = 0;
-    for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; a += (p[0] ?? p.x) * (q[1] ?? q.y) - (q[0] ?? q.x) * (p[1] ?? p.y); }
-    return a > 0;
-  });
-}
 
+/**
+ * Molde madre de dos bloques con corte vertical (como un molde de figura):
+ * - al master se le agrega un disco de base y queda de pie sobre él;
+ * - cada mitad es un bloque de caras planas con la cavidad ajustada a la forma (espacio de silicona);
+ * - embudo arriba, respiradero, 4 llaves esféricas y pestañas laterales para pinzas.
+ */
 function generate() {
   const p = params(), L = layout(p), ax = state.axis;
   const T = []; const keep = (m) => (T.push(m), m);
@@ -678,94 +677,121 @@ function generate() {
     const sz = L.mMax.clone().sub(L.mMin), diag = sz.length();
     const dense = model.tris < 60000 ? keep(master.refineToLength(Math.max(p.sil * 0.6, diag / 120))) : master;
 
-    // 2) OUTER = superficie exterior de la silicona; shell = OUTER + pared PETG
+    // 2) OUTER = superficie exterior de la silicona (offset conforme)
     const field = makeDistanceField(master, diag + 2 * (p.sil + p.wall));
-    const o1 = offsetSurface(dense, master, p.sil, () => field(p.sil)); const outer = keep(o1.man);
-    const o2 = o1.method === 'distancia'
-      ? { man: field(p.sil + p.wall), method: 'distancia' }
-      : offsetSurface(outer, outer, p.wall, () => field(p.sil + p.wall));
-    const shellOuter = keep(o2.man);
-    out.method = ['escala', 'distancia', 'pasos', 'normal'].find(m => o1.method === m || o2.method === m);
+    const o1 = offsetSurface(dense, master, p.sil, () => field(p.sil));
+    const outer = keep(o1.man);
+    out.method = o1.method;
 
-    // 3) El master se apoya en la base (z0). Arriba del master las paredes suben rectas
-    //    hasta zTop para dejar la boca abierta por donde se vierte la silicona.
-    const z0 = L.mMin.z, zc = L.mMax.z, zTop = L.mMax.z + p.sil, d = L.d, FW = 12, FT = 3;
-    const chimney = (m) => keep(keep(M.Manifold.extrude(keep(m.slice(zc - 0.05)), zTop - zc + 6)).translate([0, 0, zc - 0.05]));
-    const between = (m, lo, hi) => keep(keep(m.trimByPlane([0, 0, -1], -hi)).trimByPlane([0, 0, 1], lo));
-    const outerTall = keep(outer.add(chimney(outer)));
-    const outerFull = between(outerTall, z0, zTop);
-    const solid = between(keep(shellOuter.add(chimney(shellOuter))), z0, zTop);
-    const shell = keep(solid.subtract(outerTall));
-    const silicone = keep(outerFull.subtract(master));
+    // 3) Disco de base: el master se pega encima; tapa la cavidad por abajo
+    const z0 = L.mMin.z, d = L.d, zBot = z0 - p.baseH;
+    const open0 = keep(outer.slice(z0 + 0.05));
+    const ob = open0.bounds();
+    const cx = (ob.min[0] + ob.max[0]) / 2, cy = (ob.min[1] + ob.max[1]) / 2;
+    let R = 0;
+    for (const poly of open0.toPolygons()) for (const pt of poly) R = Math.max(R, Math.hypot((pt[0] ?? pt.x) - cx, (pt[1] ?? pt.y) - cy));
+    R = Math.max(R, 8) + 3;
+    let disc = keep(cylZ(R, zBot, z0, cx, cy, 96));
+    const print = keep(master.slice(z0 + 0.3));
+    if (!print.isEmpty()) { // marca de centrado de 0,8 mm con la huella del master
+      disc = keep(disc.subtract(keep(keep(M.Manifold.extrude(keep(print.offset(p.clear, 'Round', 2, 48)), 0.8)).translate([0, 0, z0 - 0.8]))));
+    }
 
-    // 4) Brida vertical plana en el corte: 12 mm de ancho, 3 mm por mitad (se cierra con pinzas)
+    // 4) Cavidad = silicona desde la base hacia arriba
+    const cavity = keep(outer.trimByPlane([0, 0, 1], z0));
+    const silicone = keep(cavity.subtract(master));
+
+    // 5) Bloque exterior: casco convexo de la cavidad + base visto desde el corte, caras planas
     const toF = ax === 'X' ? [0, -90, 0] : [90, 0, 0], fromF = ax === 'X' ? [0, 90, 0] : [-90, 0, 0];
-    const solidF = keep(solid.rotate(toF)), outerF = keep(outerTall.rotate(toF));
-    const cutF = keep(solidF.slice(d));
-    if (cutF.isEmpty()) throw new Error('El corte vertical no atraviesa el modelo. Mueve la posición del corte.');
-    const ring = keep(cutF.offset(FW, 'Round', 2, 64));
-    const flange = (lo) => between(keep(keep(keep(keep(M.Manifold.extrude(ring, FT)).translate([0, 0, lo])).subtract(outerF)).rotate(fromF)), z0, zTop);
-    const flangeA = flange(d - FT), flangeB = flange(d);
+    const toUZ = (pt) => ax === 'X' ? [pt[1], -pt[0]] : [pt[0], -pt[1]];
+    const at = (u, z, s) => ax === 'X' ? [s, u, z] : [u, s, z];
+    const envF = keep(keep(cavity.add(keep(cylZ(R + p.clear, zBot, z0 + 0.5, cx, cy, 96)))).rotate(toF));
+    const eb = envF.boundingBox();
+    const margin = p.wall + 3;
+    // Contorno del bloque: rectángulo con esquinas achaflanadas y espacio para las llaves
+    const hullOff = keep(keep(keep(envF.project()).hull()).offset(margin, 'Round', 2, 64));
+    const hb = hullOff.bounds(), E = 12;
+    const x0 = hb.min[0] - E, x1 = hb.max[0] + E, y0 = hb.min[1] - E, y1 = hb.max[1] + E;
+    const ch = Math.max(8, Math.min(20, 0.18 * Math.min(x1 - x0, y1 - y0)));
+    const oct = keep(new M.CrossSection([[[x0 + ch, y0], [x1 - ch, y0], [x1, y0 + ch], [x1, y1 - ch], [x1 - ch, y1], [x0 + ch, y1], [x0, y1 - ch], [x0, y0 + ch]]]));
+    const outline = keep(oct.add(hullOff));
+    const nLo = eb.min[2] - margin, nHi = eb.max[2] + margin;
+    let solid = keep(keep(keep(keep(M.Manifold.extrude(outline, nHi - nLo)).translate([0, 0, nLo])).rotate(fromF)).trimByPlane([0, 0, 1], zBot));
+    const sb = solid.boundingBox(), ti = ax === 'X' ? 1 : 0;
+    const uMin = sb.min[ti], uMax = sb.max[ti], uMid = (uMin + uMax) / 2, zMax = sb.max[2], Hb = zMax - zBot;
 
-    // 5) Dividir shell y silicona en dos mitades verticales
+    // 6) Pestañas laterales en el corte para pinzas sujetadocumentos (3 mm por mitad, 12 mm hacia afuera)
+    const tabs = [];
+    for (const f of Hb > 70 ? [0.3, 0.72] : [0.5]) for (const side of [-1, 1]) {
+      const zt = zBot + f * Hb, u0 = uMid, u1 = side > 0 ? uMax + 12 : uMin - 12;
+      const a = at(Math.min(u0, u1), zt - 10, d - 3), b = at(Math.max(u0, u1), zt + 10, d + 3);
+      tabs.push([a, b]);
+      solid = keep(solid.add(keep(boxM(a, b))));
+    }
+
+    // 7) Embudo arriba y respiradero, centrados en el corte
+    const cutF = keep(keep(keep(cavity.rotate(toF))).slice(d));
+    if (cutF.isEmpty()) throw new Error('El corte vertical no atraviesa el modelo. Mueve la posición del corte.');
+    const cpts = [];
+    for (const poly of cutF.toPolygons()) for (const pt of poly) cpts.push(toUZ([pt[0] ?? pt.x, pt[1] ?? pt.y]));
+    const top = cpts.reduce((a, b) => (b[1] > a[1] ? b : a));
+    const funnelH = zMax + 2 - (top[1] - 1);
+    const funnel = keep(keep(M.Manifold.cylinder(funnelH, 3, 10, 48)).translate([...at(top[0], 0, d)].map((v, i) => i === 2 ? top[1] - 1 : v)));
+    const ventPt = cpts.filter(q => Math.abs(q[0] - top[0]) > 15 && q[1] > zBot + 0.5 * Hb).reduce((a, b) => (!a || b[1] > a[1] ? b : a), null);
+
+    // 8) Restar cavidad, hueco del disco, embudo y respiradero
+    let shell = keep(solid.subtract(cavity));
+    shell = keep(shell.subtract(keep(cylZ(R + p.clear, zBot - 1, z0 + 0.01, cx, cy, 96))));
+    shell = keep(shell.subtract(funnel));
+    if (ventPt) {
+      const v = at(ventPt[0], ventPt[1] - 1, d);
+      shell = keep(shell.subtract(keep(cylZ(1.5, ventPt[1] - 1, zMax + 2, v[0], v[1], 24))));
+    }
+    out.vent = !!ventPt;
+
+    // 9) Dividir en dos mitades por el plano vertical
     const n = ax === 'X' ? [1, 0, 0] : [0, 1, 0], nn = n.map(v => -v);
-    let A = keep(keep(shell.trimByPlane(nn, -d)).add(flangeA));
-    let B = keep(keep(shell.trimByPlane(n, d)).add(flangeB));
+    let A = keep(shell.trimByPlane(nn, -d)), B = keep(shell.trimByPlane(n, d));
     const silA = keep(silicone.trimByPlane(nn, -d)), silB = keep(silicone.trimByPlane(n, d));
 
-    // 6) Llaves de registro Ø5 en las 4 esquinas de la brida (macho en A, hembra en B)
-    const toUZ = (pt) => ax === 'X' ? [pt[1], -pt[0]] : [pt[0], -pt[1]];
-    const cands = [];
-    for (const poly of keep(cutF.offset(FW / 2, 'Round', 2, 64)).toPolygons()) for (const pt of poly) {
-      const [u, z] = toUZ([pt[0] ?? pt.x, pt[1] ?? pt.y]);
-      if (z > z0 + 5 && z < zTop - 5) cands.push([u, z]);
+    // 10) Llaves esféricas Ø8 en las esquinas de la cara del corte (macho en A, hembra en B)
+    const KR = 4;
+    const safe = keep(keep(outline.offset(-(KR + 4), 'Round', 2, 48)).subtract(keep(cutF.offset(KR + 5, 'Round', 2, 48))));
+    const kc = [];
+    for (const poly of safe.toPolygons()) for (const pt of poly) {
+      const q = toUZ([pt[0] ?? pt.x, pt[1] ?? pt.y]);
+      const inTab = tabs.some(([a, b]) => q[1] > a[2] - KR - 2 && q[1] < b[2] + KR + 2 && Math.abs(q[0] - uMid) > (uMax - uMin) / 2 - 20);
+      if (q[1] > zBot + KR + 4 && !inTab) kc.push(q);
     }
     const keyPts = [];
     for (const [du, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-      const pt = extremePoint([cands], du, dz);
-      if (pt && keyPts.every(k => Math.hypot(k[0] - pt[0], k[1] - pt[1]) > 10)) keyPts.push(pt);
+      const pt = extremePoint([kc], du, dz);
+      if (pt && keyPts.every(k => Math.hypot(k[0] - pt[0], k[1] - pt[1]) > 15)) keyPts.push(pt);
     }
     if (p.keys) for (const [u, z] of keyPts) {
-      A = keep(A.add(keep(cylN(ax, 2.5, d - 0.5, d + 2.5, u, z))));
-      B = keep(B.subtract(keep(cylN(ax, 2.5 + p.clear, d - 0.5, d + FT + 0.5, u, z))));
+      const c = at(u, z, d);
+      A = keep(A.add(keep(keep(M.Manifold.sphere(KR, 32)).translate(c))));
+      B = keep(B.subtract(keep(keep(M.Manifold.sphere(KR + p.clear, 32)).translate(c))));
     }
     out.keys = p.keys ? keyPts.length : 0;
 
-    // 7) Base plana: el master se pega encima y las dos mitades se asientan dentro de un borde
-    const foot = keep(keep(A.add(B)).slice(z0 + 0.05));
-    const fp = foot.toPolygons(), oc = outerContours(fp);
-    const filled = keep(new M.CrossSection(oc.length ? oc : fp, 'Positive'));
-    // la placa cubre todo el molde visto desde arriba, para que no se vuelque
-    const pj = keep(keep(A.add(B)).project()), pjp = pj.toPolygons(), pjo = outerContours(pjp);
-    const shadow = keep(keep(new M.CrossSection(pjo.length ? pjo : pjp, 'Positive')).add(filled));
-    const plate = keep(keep(M.Manifold.extrude(keep(shadow.offset(p.clear + 4, 'Round', 2, 64)), 3)).translate([0, 0, z0 - 3]));
-    const fenceCS = keep(keep(filled.offset(p.clear + 2, 'Round', 2, 64)).subtract(keep(filled.offset(p.clear, 'Round', 2, 64))));
-    const fence = keep(keep(M.Manifold.extrude(fenceCS, 3)).translate([0, 0, z0]));
-    let baseM = keep(plate.add(fence));
-    // Marca de centrado del master: hueco de 0,8 mm con su huella
-    const print = keep(master.slice(z0 + 0.3));
-    if (!print.isEmpty()) {
-      const recess = keep(keep(M.Manifold.extrude(keep(print.offset(p.clear, 'Round', 2, 48)), 0.8)).translate([0, 0, z0 - 0.8]));
-      baseM = keep(baseM.subtract(recess));
-    }
-
-    // 8) Verificaciones: cavidad real, no un bloque
+    // 11) Verificaciones: cavidad real, no un bloque
     if (A.isEmpty() || B.isEmpty()) throw new Error('Una de las mitades quedó vacía. Mueve el corte hacia el centro.');
-    const vOuter = outerFull.volume();
-    if (!(shell.volume() < solid.volume() - 0.9 * vOuter)) throw new Error('El shell no tiene cavidad. No se exportará un bloque sólido.');
+    const vCav = cavity.volume();
+    if (!(shell.volume() < solid.volume() - 0.9 * vCav)) throw new Error('El molde no tiene cavidad. No se exportará un bloque sólido.');
     const touch = keep(master.intersect(keep(A.add(B))));
-    if (touch.volume() > 0.001 * vMaster) out.warnings.push('El master toca el shell. Aumenta el grosor de silicona.');
+    if (touch.volume() > 0.001 * vMaster) out.warnings.push('El master toca el molde. Aumenta el grosor de silicona.');
 
     const boxVol = (sz.x + 2 * p.sil) * (sz.y + 2 * p.sil) * (sz.z + p.sil);
-    out.A = manifoldToGeometry(A); out.B = manifoldToGeometry(B); out.base = manifoldToGeometry(baseM);
+    out.A = manifoldToGeometry(A); out.B = manifoldToGeometry(B); out.base = manifoldToGeometry(disc);
     out.silA = manifoldToGeometry(silA); out.silB = manifoldToGeometry(silB);
     out.masterGeom = manifoldToGeometry(master);
     const bb = new THREE.Box3();
-    for (const g of [out.A, out.B, out.base]) bb.union(new THREE.Box3().setFromBufferAttribute(g.getAttribute('position')));
+    for (const g of [out.A, out.B]) bb.union(new THREE.Box3().setFromBufferAttribute(g.getAttribute('position')));
     out.stats = {
-      outer: bb.getSize(new THREE.Vector3()), scale: p.scale, d, axis: ax,
-      silMl: (vOuter - vMaster) / 1000, boxMl: (boxVol - vMaster) / 1000,
-      shellMl: (A.volume() + B.volume() + baseM.volume()) / 1000,
+      outer: bb.getSize(new THREE.Vector3()), scale: p.scale, d, axis: ax, discD: 2 * R,
+      silMl: (vCav - vMaster) / 1000, boxMl: (boxVol - vMaster) / 1000,
+      shellMl: (A.volume() + B.volume() + disc.volume()) / 1000,
     };
     out.ok = true;
   } catch (e) {
@@ -854,7 +880,7 @@ function filesFor(which) {
     // cada mitad se acuesta sobre la cara del corte (brida plana sobre la cama)
     A: () => ({ name: 'Shell_A.stl', data: stlBytes(result.A, result.stats.axis === 'X' ? { y: Math.PI / 2 } : { x: -Math.PI / 2 }) }),
     B: () => ({ name: 'Shell_B.stl', data: stlBytes(result.B, result.stats.axis === 'X' ? { y: -Math.PI / 2 } : { x: Math.PI / 2 }) }),
-    base: () => ({ name: 'Base.stl', data: stlBytes(result.base) }),
+    base: () => ({ name: 'Base_master.stl', data: stlBytes(result.base) }),
     master: () => ({ name: `${base}_escalado.stl`, data: stlBytes(result.masterGeom) }),
   };
   return which === 'all' ? Object.values(f).map(fn => fn()) : [f[which]()];
@@ -915,6 +941,7 @@ function updateOutputs() {
   $('wallOut').textContent = (+$('wall').value).toFixed(1) + ' mm';
   $('gapOut').textContent = (+$('gap').value).toFixed(1) + ' mm';
   $('clearOut').textContent = (+$('clear').value).toFixed(2) + ' mm';
+  $('baseHOut').textContent = (+$('baseH').value).toFixed(1) + ' mm';
   $('partOut').textContent = ((+$('part').value) > 0 ? '+' : '') + (+$('part').value).toFixed(1) + ' mm';
   for (const id of ['rotX', 'rotY', 'rotZ']) $(id + 'Out').textContent = (+$(id).value) + '°';
   $('explodeOut').textContent = (+$('explode').value) + ' mm';
@@ -941,7 +968,7 @@ document.querySelectorAll('.seg').forEach(seg => {
     if (key === 'axis') { setPartRange(); invalidate(); }
   });
 });
-for (const id of ['wall', 'gap', 'clear', 'part']) {
+for (const id of ['wall', 'gap', 'clear', 'part', 'baseH']) {
   $(id).addEventListener('input', () => { updateOutputs(); invalidate(); });
 }
 for (const id of ['keys']) $(id).addEventListener('change', invalidate);
@@ -994,7 +1021,7 @@ $('genBtn').addEventListener('click', async () => {
   }
   result = r;
   showResult(); refreshExport();
-  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Corte vertical ${r.stats.axis === 'X' ? 'izquierda | derecha' : 'frente | atrás'}, ${r.keys} llaves de registro. Cierra la brida (6 mm de grueso) con pinzas sujetadocumentos de 25 mm o más.`));
+  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Corte vertical ${r.stats.axis === 'X' ? 'izquierda | derecha' : 'frente | atrás'}, disco de base Ø${fmt(r.stats.discD, 0)} mm, ${r.keys} llaves esféricas, embudo${r.vent ? ' y respiradero' : ''}. Cierra las pestañas (6 mm) con pinzas sujetadocumentos de 25 mm o más.`));
   if (r.method === 'escala') msgs.append(note('warn', '<b>Se usó el método de respaldo:</b> el offset por normales falló, la silicona se calculó escalando el modelo desde su centroide y suavizando. El grosor no es uniforme; revisa la vista previa.'));
   for (const w of r.warnings) msgs.append(note('warn', w));
 });
