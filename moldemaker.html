@@ -116,6 +116,22 @@ label.check:has(input:checked){border-color:var(--ok)}
           <div class="stat" style="grid-column:1/-1"><small>Caja (X × Y × Z)</small><b id="stBox">—</b></div>
         </div>
         <div id="fileMsgs" class="flex flex-col gap-2"></div>
+        <div class="flex flex-col gap-3">
+          <span class="label">Girar el modelo</span>
+          <span class="hint">La cara que quede abajo es la que se pega a la base y será la boca del molde.</span>
+          <div class="range-row"><label class="label" for="rotX">Girar en X</label><output id="rotXOut" for="rotX"></output>
+            <input id="rotX" type="range" min="-180" max="180" step="5" value="0"></div>
+          <div class="range-row"><label class="label" for="rotY">Girar en Y</label><output id="rotYOut" for="rotY"></output>
+            <input id="rotY" type="range" min="-180" max="180" step="5" value="0"></div>
+          <div class="range-row"><label class="label" for="rotZ">Girar en Z</label><output id="rotZOut" for="rotZ"></output>
+            <input id="rotZ" type="range" min="-180" max="180" step="5" value="0"></div>
+          <div class="seg" id="rotBtns">
+            <button type="button" data-rot="rotX">X +90°</button>
+            <button type="button" data-rot="rotY">Y +90°</button>
+            <button type="button" data-rot="rotZ">Z +90°</button>
+            <button type="button" data-rot="reset">Restablecer</button>
+          </div>
+        </div>
       </section>
 
       <section class="panel flex flex-col gap-4" aria-labelledby="h-mat">
@@ -151,29 +167,23 @@ label.check:has(input:checked){border-color:var(--ok)}
       <section class="panel flex flex-col gap-4" aria-labelledby="h-dim">
         <div class="step">Paso 3</div>
         <h2 id="h-dim" class="text-lg font-bold">Molde conforme</h2>
-        <p class="hint">La silicona y el shell siguen la forma del master con grosor uniforme. Solo la brida de la partición es plana.</p>
+        <p class="hint">La silicona y el shell siguen la forma del master. El master se pega sobre una base plana, el shell se abre en dos mitades con un corte vertical y la silicona se vierte por arriba.</p>
         <div class="range-row"><label class="label" for="wall">Grosor de pared</label><output id="wallOut" for="wall"></output>
           <input id="wall" type="range" min="2" max="4" step="0.1" value="2.5"></div>
         <div class="range-row"><label class="label" for="gap">Grosor de silicona</label><output id="gapOut" for="gap"></output>
           <input id="gap" type="range" min="6" max="12" step="0.5" value="8"></div>
         <div class="range-row"><label class="label" for="clear">Holgura FDM</label><output id="clearOut" for="clear"></output>
           <input id="clear" type="range" min="0.1" max="0.8" step="0.05" value="0.4"></div>
-        <div class="range-row"><label class="label" for="part">Altura línea de partición</label><output id="partOut" for="part"></output>
-          <input id="part" type="range" min="0" max="100" step="0.5" value="50"></div>
+        <div class="flex flex-col gap-2">
+          <span class="label">Dirección del corte vertical</span>
+          <div class="seg" data-group="axis">
+            <button type="button" data-v="X" aria-pressed="true">Izquierda | Derecha</button>
+            <button type="button" data-v="Y" aria-pressed="false">Frente | Atrás</button>
+          </div>
+        </div>
+        <div class="range-row"><label class="label" for="part">Posición del corte (desde el centro)</label><output id="partOut" for="part"></output>
+          <input id="part" type="range" min="-50" max="50" step="0.5" value="0"></div>
         <label class="switch" for="keys"><span><span class="label">Llaves de registro (4 × Ø5 mm)</span><br><span class="hint">En la brida plana de 12 mm, que se cierra con pinzas sujetadocumentos</span></span><input id="keys" type="checkbox" checked></label>
-      </section>
-
-      <section class="panel flex flex-col gap-4" aria-labelledby="h-wick">
-        <div class="step">Paso 4</div>
-        <h2 id="h-wick" class="text-lg font-bold">Boca de vertido</h2>
-        <div class="range-row"><label class="label" for="wickX">Posición de la boca X</label><output id="wickXOut" for="wickX"></output>
-          <input id="wickX" type="range" min="-50" max="50" step="0.5" value="0"></div>
-        <div class="range-row"><label class="label" for="wickY">Posición de la boca Y</label><output id="wickYOut" for="wickY"></output>
-          <input id="wickY" type="range" min="-50" max="50" step="0.5" value="0"></div>
-        <button type="button" class="btn btn-ghost" id="pickWick" aria-pressed="false">Colocar la boca con clic en el modelo</button>
-        <div class="range-row"><label class="label" for="funnel">Diámetro de la boca</label><output id="funnelOut" for="funnel"></output>
-          <input id="funnel" type="range" min="15" max="20" step="0.5" value="18"></div>
-        <p class="hint">La boca es un tapón cilíndrico que pegas arriba del master. Cuelga el master dentro del shell y deja la abertura del molde de silicona.</p>
       </section>
 
       <button type="button" class="btn btn-primary" id="genBtn" disabled>Generar Molde</button>
@@ -188,7 +198,7 @@ label.check:has(input:checked){border-color:var(--ok)}
           <span><i class="dot" style="background:#e58fb0"></i>Silicona</span>
           <span><i class="dot" style="background:#4aa39c"></i>Shell A</span>
           <span><i class="dot" style="background:#6f86c9"></i>Shell B</span>
-          <span><i class="dot" style="background:#d6402f"></i>Centro de la boca</span>
+          <span><i class="dot" style="background:#9aa3a6"></i>Base</span>
         </div>
         <div class="busy" id="busy" hidden>Calculando booleanas…</div>
       </div>
@@ -208,7 +218,7 @@ label.check:has(input:checked){border-color:var(--ok)}
           <div class="stat"><small>Con caja rectangular</small><b id="rsBox">—</b></div>
           <div class="stat"><small>Ahorro</small><b id="rsSave">—</b></div>
           <div class="stat"><small>Shell con brida</small><b id="rsOuter">—</b></div>
-          <div class="stat"><small>Shell A+B aprox.</small><b id="rsShell">—</b></div>
+          <div class="stat"><small>PETG (A + B + base)</small><b id="rsShell">—</b></div>
           <div class="stat"><small>Escala master</small><b id="rsScale">—</b></div>
         </div>
         <p class="hint">Silicona = volumen OUTER − volumen del master. Densidad 1,1 g/ml. La caja es la del método anterior con el mismo grosor por lado. <span id="rsMethod"></span></p>
@@ -232,20 +242,21 @@ label.check:has(input:checked){border-color:var(--ok)}
         <p class="hint" id="exportState">Genera el molde para habilitar la descarga.</p>
         <button type="button" class="btn btn-primary exp" data-file="A" disabled>Descargar Shell_A.stl</button>
         <button type="button" class="btn btn-primary exp" data-file="B" disabled>Descargar Shell_B.stl</button>
-        <button type="button" class="btn btn-ghost exp" data-file="plug" disabled>Tapón de la boca (.stl)</button>
+        <button type="button" class="btn btn-primary exp" data-file="base" disabled>Descargar Base.stl</button>
         <button type="button" class="btn btn-ghost exp" data-file="master" disabled>Master escalado (.stl)</button>
         <button type="button" class="btn btn-ghost exp" data-file="all" disabled>Todo en un .zip</button>
-        <p class="hint">STL binario en mm. Shell B se exporta volteado (tapa sobre la cama) para imprimir sin soportes. Dentro de Claude los STL se entregan en un .zip.</p>
+        <p class="hint">STL binario en mm. Shell A y B se exportan acostados sobre la cara del corte; la base, tal cual. Dentro de Claude los STL se entregan en un .zip.</p>
         <div id="expMsgs" class="flex flex-col gap-2"></div>
       </section>
 
       <section class="panel flex flex-col gap-3" aria-labelledby="h-how">
         <h2 id="h-how" class="text-lg font-bold">Cómo hacer el molde</h2>
         <ol class="steps">
-          <li>Imprime Shell A y Shell B en PETG (3–4 perímetros, 20 % relleno).</li>
-          <li>Pega el tapón de la boca al master, colócalo dentro y cierra A + B con las llaves y sujeta la brida con 6–8 pinzas sujetadocumentos de 25 mm o más, repartidas alrededor.</li>
-          <li>Vierte silicona platino por el orificio de colada Ø10 hasta que salga por el respiradero. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
-          <li>Abre el shell, corta la silicona en zigzag por un lado y saca el master. Tu molde de silicona está listo.</li>
+          <li>Imprime Shell A, Shell B y la Base en PETG (3–4 perímetros, 20 % relleno).</li>
+          <li>Pega el master sobre la base, dentro de la marca de centrado.</li>
+          <li>Une A + B con las llaves, sujeta la brida con 6–8 pinzas sujetadocumentos de 25 mm o más y asiéntalas dentro del borde de la base. Sella la junta con plastilina si hace falta.</li>
+          <li>Vierte la silicona por arriba, despacio y por un costado, hasta el borde. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
+          <li>Quita las pinzas, abre A y B, despega la base y saca el master. El hueco donde estaba pegado a la base es la boca de tu molde de silicona.</li>
         </ol>
       </section>
     </div>
@@ -282,7 +293,7 @@ const SILICONE = {
   P10: { name: 'Platino Shore 10', scale: 1.001, clearance: 0.4, note: 'Muy blanda, ideal para figuras con detalle profundo.' },
   T30: { name: 'Estaño Shore 30', scale: 1.008, clearance: 0.4, note: 'Más rígida y encoge un poco más.' },
 };
-const state = { master: 'PLA', shellMat: 'PETG', silicone: 'P15' };
+const state = { master: 'PLA', shellMat: 'PETG', silicone: 'P15', axis: 'X' };
 
 /* ---------- Motor manifold-3d (WASM incrustado) ---------- */
 let M = null;
@@ -314,11 +325,11 @@ grid.rotation.x = Math.PI / 2; grid.material.transparent = true; grid.material.o
 const matMaster = new THREE.MeshStandardMaterial({ color: 0xe3a23c, roughness: 0.55, metalness: 0.05 });
 const matA = new THREE.MeshStandardMaterial({ color: 0x4aa39c, roughness: 0.4, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
 const matB = new THREE.MeshStandardMaterial({ color: 0x6f86c9, roughness: 0.4, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
-const matWick = new THREE.LineBasicMaterial({ color: 0xd6402f });
 const matSil = new THREE.MeshStandardMaterial({ color: 0xe58fb0, roughness: 0.7, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
+const matBase = new THREE.MeshStandardMaterial({ color: 0x9aa3a6, roughness: 0.6 });
 const matPlane = new THREE.MeshBasicMaterial({ color: 0xd9822b, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
 
-const groups = { master: new THREE.Group(), preview: new THREE.Group(), A: new THREE.Group(), B: new THREE.Group() };
+const groups = { master: new THREE.Group(), preview: new THREE.Group(), A: new THREE.Group(), B: new THREE.Group(), base: new THREE.Group() };
 Object.values(groups).forEach(g => scene.add(g));
 
 function resize() {
@@ -375,8 +386,7 @@ function manifoldToGeometry(man) {
 
 /* ---------- Estado del modelo ---------- */
 let model = null;   // { name, geom (centrada), merged, tris, size, bbox, watertight }
-let result = null;  // { A, B, plug, master: THREE.BufferGeometry, ok }
-let pickMode = false;
+let result = null;  // { A, B, base, silA, silB, masterGeom: THREE.BufferGeometry, ok }
 
 const exporter = new STLExporter();
 const loader = new STLLoader();
@@ -385,41 +395,54 @@ function fmt(n, d = 1) { return Number(n).toLocaleString('es', { minimumFraction
 function note(kind, html) { const d = document.createElement('div'); d.className = 'note note-' + kind; d.innerHTML = html; return d; }
 
 function loadBuffer(buf, name, isSample = false) {
-  let geom;
-  try { geom = loader.parse(buf); } catch (e) { showFileError('No se pudo leer el STL. ¿Es un archivo .stl válido?'); return; }
-  const pos = geom.getAttribute('position');
+  let src;
+  try { src = loader.parse(buf); } catch (e) { showFileError('No se pudo leer el STL. ¿Es un archivo .stl válido?'); return; }
+  const pos = src.getAttribute('position');
   if (!pos || pos.count < 12) { showFileError('El STL no contiene triángulos suficientes.'); return; }
-  geom.computeBoundingBox();
-  const c = new THREE.Vector3(); geom.boundingBox.getCenter(c);
-  geom.translate(-c.x, -c.y, -c.z); // centrar en el origen
-  geom.computeBoundingBox(); geom.computeVertexNormals();
-  const size = new THREE.Vector3(); geom.boundingBox.getSize(size);
-  const tris = geom.index ? geom.index.count / 3 : pos.count / 3;
-  const an = analyzeGeometry(geom);
-  model = { name, geom, merged: an.merged, tris, size, bbox: geom.boundingBox.clone(), watertight: an.watertight, open: an.open, nonManifold: an.nonManifold, isSample };
-  result = null;
+  src.deleteAttribute('normal');
+  for (const id of ['rotX', 'rotY', 'rotZ']) $(id).value = 0;
+  const tris = src.index ? src.index.count / 3 : pos.count / 3;
+  model = { name, src, tris, isSample };
+  applyOrientation();
 
   $('stName').textContent = name + (isSample ? ' (ejemplo)' : '');
   $('stTris').textContent = tris.toLocaleString('es');
-  $('stBox').textContent = `${fmt(size.x)} × ${fmt(size.y)} × ${fmt(size.z)} mm`;
-  $('stWater').textContent = an.watertight ? 'Sí' : 'No';
-  $('stWater').style.color = an.watertight ? 'var(--ok)' : 'var(--bad)';
+  $('stWater').textContent = model.watertight ? 'Sí' : 'No';
+  $('stWater').style.color = model.watertight ? 'var(--ok)' : 'var(--bad)';
   const msgs = $('fileMsgs'); msgs.innerHTML = '';
   if (isSample) msgs.append(note('ok', 'Modelo de <b>ejemplo</b>. Sube tu STL para reemplazarlo.'));
   if (!isSample) document.querySelectorAll('#samples button').forEach(b => b.setAttribute('aria-pressed', 'false'));
   if (tris > 250000) msgs.append(note('warn', `<b>Modelo pesado:</b> ${tris.toLocaleString('es')} triángulos. Las booleanas pueden tardar o congelar el navegador. Reduce la malla (Decimate) a menos de 250 000.`));
-  if (!an.watertight) msgs.append(note('bad', `<b>El STL no es hermético:</b> ${an.open} bordes abiertos, ${an.nonManifold} bordes no-manifold. Repáralo en tu slicer (PrusaSlicer → Reparar con Netfabb) o Meshmixer antes de generar.`));
-  if (Math.min(size.x, size.y, size.z) < 3) msgs.append(note('warn', 'El modelo es casi plano. MoldeMaker está pensado para figuras 3D.'));
-
-  // límites de sliders
-  for (const [id, half] of [['wickX', size.x / 2], ['wickY', size.y / 2]]) {
-    const el = $(id); el.min = (-half).toFixed(1); el.max = half.toFixed(1); el.value = 0;
-  }
-  $('part').min = 0; $('part').max = size.z.toFixed(1); $('part').value = (size.z / 2).toFixed(1);
+  if (!model.watertight) msgs.append(note('bad', `<b>El STL no es hermético:</b> ${model.open} bordes abiertos, ${model.nonManifold} bordes no-manifold. Repáralo en tu slicer (PrusaSlicer → Reparar con Netfabb) o Meshmixer antes de generar.`));
+  if (Math.min(model.size.x, model.size.y, model.size.z) < 3) msgs.append(note('warn', 'El modelo es casi plano. MoldeMaker está pensado para figuras 3D.'));
+  frameCamera();
+}
+// Gira el STL original con los controles de orientación y lo vuelve a centrar en el origen
+function applyOrientation() {
+  if (!model) return;
+  const rx = +$('rotX').value, ry = +$('rotY').value, rz = +$('rotZ').value;
+  const geom = model.src.clone();
+  geom.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx * Math.PI / 180, ry * Math.PI / 180, rz * Math.PI / 180, 'XYZ')));
+  geom.computeBoundingBox();
+  const c = new THREE.Vector3(); geom.boundingBox.getCenter(c);
+  geom.translate(-c.x, -c.y, -c.z);
+  geom.computeBoundingBox(); geom.computeVertexNormals();
+  const size = new THREE.Vector3(); geom.boundingBox.getSize(size);
+  const an = analyzeGeometry(geom);
+  model.geom?.dispose();
+  Object.assign(model, { geom, merged: an.merged, size, bbox: geom.boundingBox.clone(), watertight: an.watertight, open: an.open, nonManifold: an.nonManifold });
+  $('stBox').textContent = `${fmt(size.x)} × ${fmt(size.y)} × ${fmt(size.z)} mm`;
+  result = null;
+  setPartRange();
   updateOutputs();
   showMaster();
-  frameCamera();
   invalidate();
+}
+function setPartRange() {
+  if (!model) return;
+  const half = (state.axis === 'X' ? model.size.x : model.size.y) / 2 * 0.8;
+  const el = $('part'); el.min = (-half).toFixed(1); el.max = half.toFixed(1); el.value = 0;
+  updateOutputs();
 }
 function showFileError(msg) { const m = $('fileMsgs'); m.innerHTML = ''; m.append(note('bad', msg)); }
 
@@ -436,16 +459,14 @@ function params() {
   return {
     scale,
     wall: +$('wall').value, sil: +$('gap').value, clear: +$('clear').value,
-    partH: +$('part').value, keys: $('keys').checked,
-    wx: +$('wickX').value, wy: +$('wickY').value,
-    funnel: +$('funnel').value,
+    part: +$('part').value, keys: $('keys').checked,
   };
 }
 // Caja del master escalado (escala sobre el origen) — solo para medidas y comparación
 function layout(p) {
   const b = model.bbox, s = p.scale;
   const mMin = b.min.clone().multiplyScalar(s), mMax = b.max.clone().multiplyScalar(s);
-  return { mMin, mMax, zp: mMin.z + p.partH * s, wx: p.wx * s, wy: p.wy * s };
+  return { mMin, mMax, d: p.part * s };
 }
 
 /* ---------- Vista previa antes de generar ---------- */
@@ -457,7 +478,6 @@ function showMaster() {
   mesh.scale.setScalar(p.scale);
   mesh.name = 'master';
   groups.master.add(mesh);
-  if (result?.plugGeom) groups.master.add(new THREE.Mesh(result.plugGeom, matMaster));
   updatePreview();
 }
 function updatePreview() {
@@ -466,15 +486,12 @@ function updatePreview() {
   const p = params(), L = layout(p);
   const size = L.mMax.clone().sub(L.mMin);
   if (!result) {
-    const pw = size.x + 2 * (p.sil + p.wall + 14), ph = size.y + 2 * (p.sil + p.wall + 14);
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), matPlane);
-    plane.position.set((L.mMin.x + L.mMax.x) / 2, (L.mMin.y + L.mMax.y) / 2, L.zp);
+    const tang = (state.axis === 'X' ? size.y : size.x) + 2 * (p.sil + p.wall + 14), h = size.z + p.sil + 16;
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(state.axis === 'X' ? h : tang, state.axis === 'X' ? tang : h), matPlane);
+    const cz = (L.mMin.z + L.mMax.z + p.sil) / 2;
+    if (state.axis === 'X') { plane.rotation.y = Math.PI / 2; plane.position.set(L.d, (L.mMin.y + L.mMax.y) / 2, cz); }
+    else { plane.rotation.x = Math.PI / 2; plane.position.set((L.mMin.x + L.mMax.x) / 2, L.d, cz); }
     groups.preview.add(plane);
-  }
-  {
-    const e = +$('explode').value, ext = p.sil + p.wall;
-    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(L.wx, L.wy, L.mMin.z - ext - 10 - e / 2), new THREE.Vector3(L.wx, L.wy, L.mMax.z + ext + 25 + e / 2)]);
-    groups.preview.add(new THREE.Line(g, matWick));
   }
 }
 
@@ -625,16 +642,12 @@ function makeDistanceField(master, diag) {
 }
 
 /* ---------- Generación del molde conforme (manifold-3d) ---------- */
-function cylZ(r, z0, z1, x, y, seg = 48) {
-  return M.Manifold.cylinder(z1 - z0, r, r, seg).translate([x, y, z0]);
-}
-// Altura del master en (x,y): rayo vertical desde arriba (null si no hay master debajo)
-function masterTopAt(x, y) {
-  const ray = new THREE.Raycaster(new THREE.Vector3(x, y, 1e4), new THREE.Vector3(0, 0, -1));
-  const m = groups.master.children.find(c => c.name === 'master');
-  m.updateMatrixWorld(true);
-  const hit = ray.intersectObject(m, false)[0];
-  return hit ? hit.point.z : null;
+// Cilindro a lo largo de la normal del corte (X o Y), de s0 a s1 sobre ese eje, centrado en (u, z) del plano
+function cylN(axis, r, s0, s1, u, z, seg = 32) {
+  const c = M.Manifold.cylinder(s1 - s0, r, r, seg).translate([0, 0, s0]);
+  const rc = c.rotate(axis === 'X' ? [0, 90, 0] : [-90, 0, 0]); c.delete();
+  const t = rc.translate(axis === 'X' ? [0, u, z] : [u, 0, z]); rc.delete();
+  return t;
 }
 function extremePoint(polys, dx, dy) {
   let best = null, bd = -Infinity;
@@ -644,9 +657,17 @@ function extremePoint(polys, dx, dy) {
   }
   return best;
 }
+// Solo los contornos exteriores (sin huecos) de una sección
+function outerContours(polys) {
+  return polys.filter(poly => {
+    let a = 0;
+    for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length]; a += (p[0] ?? p.x) * (q[1] ?? q.y) - (q[0] ?? q.x) * (p[1] ?? p.y); }
+    return a > 0;
+  });
+}
 
 function generate() {
-  const p = params(), L = layout(p);
+  const p = params(), L = layout(p), ax = state.axis;
   const T = []; const keep = (m) => (T.push(m), m);
   const out = { warnings: [] };
   try {
@@ -654,90 +675,97 @@ function generate() {
     const master = keep(keep(mergedToManifold(model.merged)).scale([p.scale, p.scale, p.scale]));
     if (master.isEmpty() || master.volume() <= 0) throw new Error('El master no forma un sólido cerrado.');
     const vMaster = master.volume();
-    // malla densa para que el offset siga bien la forma
     const sz = L.mMax.clone().sub(L.mMin), diag = sz.length();
-    const base = model.tris < 60000 ? keep(master.refineToLength(Math.max(p.sil * 0.6, diag / 120))) : master;
+    const dense = model.tris < 60000 ? keep(master.refineToLength(Math.max(p.sil * 0.6, diag / 120))) : master;
 
-    // 2) OUTER = superficie exterior de la silicona (offset por normales)
+    // 2) OUTER = superficie exterior de la silicona; shell = OUTER + pared PETG
     const field = makeDistanceField(master, diag + 2 * (p.sil + p.wall));
-    const o1 = offsetSurface(base, master, p.sil, () => field(p.sil)); const outer = keep(o1.man);
-    // 3) Silicona = OUTER − master (grosor uniforme)
-    const silicone = keep(outer.subtract(master));
-    // 4) Shell rígido = offset de OUTER + pared PETG
+    const o1 = offsetSurface(dense, master, p.sil, () => field(p.sil)); const outer = keep(o1.man);
     const o2 = o1.method === 'distancia'
       ? { man: field(p.sil + p.wall), method: 'distancia' }
       : offsetSurface(outer, outer, p.wall, () => field(p.sil + p.wall));
     const shellOuter = keep(o2.man);
-    let shell = keep(shellOuter.subtract(outer));
     out.method = ['escala', 'distancia', 'pasos', 'normal'].find(m => o1.method === m || o2.method === m);
 
-    // 5) Brida plana en la línea de partición: 12 mm de ancho, 3 mm por mitad
-    const zp = L.zp, FW = 12, FT = 3;
-    const cut = keep(shellOuter.slice(zp));
-    if (cut.isEmpty()) throw new Error('La línea de partición no corta el modelo. Muévela dentro de su altura.');
-    const ring = keep(cut.offset(FW, 'Round', 2, 64));
-    const flangeA = keep(keep(keep(M.Manifold.extrude(ring, FT)).translate([0, 0, zp - FT])).subtract(outer));
-    const flangeB = keep(keep(keep(M.Manifold.extrude(ring, FT)).translate([0, 0, zp])).subtract(outer));
+    // 3) El master se apoya en la base (z0). Arriba del master las paredes suben rectas
+    //    hasta zTop para dejar la boca abierta por donde se vierte la silicona.
+    const z0 = L.mMin.z, zc = L.mMax.z, zTop = L.mMax.z + p.sil, d = L.d, FW = 12, FT = 3;
+    const chimney = (m) => keep(keep(M.Manifold.extrude(keep(m.slice(zc - 0.05)), zTop - zc + 6)).translate([0, 0, zc - 0.05]));
+    const between = (m, lo, hi) => keep(keep(m.trimByPlane([0, 0, -1], -hi)).trimByPlane([0, 0, 1], lo));
+    const outerTall = keep(outer.add(chimney(outer)));
+    const outerFull = between(outerTall, z0, zTop);
+    const solid = between(keep(shellOuter.add(chimney(shellOuter))), z0, zTop);
+    const shell = keep(solid.subtract(outerTall));
+    const silicone = keep(outerFull.subtract(master));
 
-    // 6) Dividir silicona y shell en A (abajo) y B (arriba)
-    let A = keep(keep(shell.trimByPlane([0, 0, -1], -zp)).add(flangeA));
-    let B = keep(keep(shell.trimByPlane([0, 0, 1], zp)).add(flangeB));
-    const silA = keep(silicone.trimByPlane([0, 0, -1], -zp));
-    const silB = keep(silicone.trimByPlane([0, 0, 1], zp));
+    // 4) Brida vertical plana en el corte: 12 mm de ancho, 3 mm por mitad (se cierra con pinzas)
+    const toF = ax === 'X' ? [0, -90, 0] : [90, 0, 0], fromF = ax === 'X' ? [0, 90, 0] : [-90, 0, 0];
+    const solidF = keep(solid.rotate(toF)), outerF = keep(outerTall.rotate(toF));
+    const cutF = keep(solidF.slice(d));
+    if (cutF.isEmpty()) throw new Error('El corte vertical no atraviesa el modelo. Mueve la posición del corte.');
+    const ring = keep(cutF.offset(FW, 'Round', 2, 64));
+    const flange = (lo) => between(keep(keep(keep(keep(M.Manifold.extrude(ring, FT)).translate([0, 0, lo])).subtract(outerF)).rotate(fromF)), z0, zTop);
+    const flangeA = flange(d - FT), flangeB = flange(d);
 
-    // 7) Llaves de registro (Ø5) en la brida. La brida se cierra con pinzas sujetadocumentos, sin tornillos.
-    const mid = keep(cut.offset(FW / 2, 'Round', 2, 64)).toPolygons();
-    const keyPts = [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([dx, dy]) => extremePoint(mid, dx, dy)).filter(Boolean);
-    if (p.keys) for (const [x, y] of keyPts) {
-      A = keep(A.add(keep(cylZ(2.5, zp - 0.5, zp + 2.5, x, y, 32))));
-      B = keep(B.subtract(keep(cylZ(2.5 + p.clear, zp - 0.5, zp + FT + 0.5, x, y, 32))));
+    // 5) Dividir shell y silicona en dos mitades verticales
+    const n = ax === 'X' ? [1, 0, 0] : [0, 1, 0], nn = n.map(v => -v);
+    let A = keep(keep(shell.trimByPlane(nn, -d)).add(flangeA));
+    let B = keep(keep(shell.trimByPlane(n, d)).add(flangeB));
+    const silA = keep(silicone.trimByPlane(nn, -d)), silB = keep(silicone.trimByPlane(n, d));
+
+    // 6) Llaves de registro Ø5 en las 4 esquinas de la brida (macho en A, hembra en B)
+    const toUZ = (pt) => ax === 'X' ? [pt[1], -pt[0]] : [pt[0], -pt[1]];
+    const cands = [];
+    for (const poly of keep(cutF.offset(FW / 2, 'Round', 2, 64)).toPolygons()) for (const pt of poly) {
+      const [u, z] = toUZ([pt[0] ?? pt.x, pt[1] ?? pt.y]);
+      if (z > z0 + 5 && z < zTop - 5) cands.push([u, z]);
+    }
+    const keyPts = [];
+    for (const [du, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const pt = extremePoint([cands], du, dz);
+      if (pt && keyPts.every(k => Math.hypot(k[0] - pt[0], k[1] - pt[1]) > 10)) keyPts.push(pt);
+    }
+    if (p.keys) for (const [u, z] of keyPts) {
+      A = keep(A.add(keep(cylN(ax, 2.5, d - 0.5, d + 2.5, u, z))));
+      B = keep(B.subtract(keep(cylN(ax, 2.5 + p.clear, d - 0.5, d + FT + 0.5, u, z))));
     }
     out.keys = p.keys ? keyPts.length : 0;
 
-    // 8) Reservorio / embudo: tapón que cuelga el master + asiento plano sobre Shell B
-    const rr = p.funnel / 2;
-    const topZ = shellOuter.boundingBox().max[2];
-    const mTop = masterTopAt(L.wx, L.wy) ?? L.mMax.z;
-    const seat = topZ + 3;
-    const boss = keep(keep(cylZ(rr + p.clear + 3, zp + FT, seat, L.wx, L.wy, 64)).subtract(outer));
-    B = keep(B.add(boss));
-    B = keep(B.subtract(keep(cylZ(rr + p.clear, mTop, seat + 1, L.wx, L.wy, 64))));
-    // Base del tapón: baja hasta el punto más bajo del master bajo su borde y luego se recorta con la forma del master,
-    // así encaja como una tapa sobre superficies curvas sin dejar huecos para la silicona.
-    let lowest = mTop;
-    for (let i = 0; i < 24; i++) {
-      const a = (i / 24) * Math.PI * 2, z = masterTopAt(L.wx + Math.cos(a) * rr, L.wy + Math.sin(a) * rr);
-      lowest = Math.min(lowest, z ?? mTop - rr);
-    }
-    const plugBottom = Math.max(lowest - 1, mTop - 1.5 * rr - 1.5);
-    let plug = keep(cylZ(rr, plugBottom, seat + 2.2, L.wx, L.wy, 64));
-    plug = keep(plug.add(keep(cylZ(rr + 8, seat + 0.2, seat + 2.2, L.wx, L.wy, 64))));
-    plug = keep(plug.subtract(master));
-
-    // Colada de silicona (Ø10) y respiradero (Ø4) a los lados del reservorio
-    const off = rr + p.clear + 3 + 7;
-    for (const [dx, r] of [[off, 5], [-off, 2]]) {
-      const x = L.wx + dx, y = L.wy, z0 = masterTopAt(x, y) ?? zp + FT;
-      B = keep(B.subtract(keep(cylZ(r, z0 + 0.5, seat + 1, x, y, 32))));
+    // 7) Base plana: el master se pega encima y las dos mitades se asientan dentro de un borde
+    const foot = keep(keep(A.add(B)).slice(z0 + 0.05));
+    const fp = foot.toPolygons(), oc = outerContours(fp);
+    const filled = keep(new M.CrossSection(oc.length ? oc : fp, 'Positive'));
+    // la placa cubre todo el molde visto desde arriba, para que no se vuelque
+    const pj = keep(keep(A.add(B)).project()), pjp = pj.toPolygons(), pjo = outerContours(pjp);
+    const shadow = keep(keep(new M.CrossSection(pjo.length ? pjo : pjp, 'Positive')).add(filled));
+    const plate = keep(keep(M.Manifold.extrude(keep(shadow.offset(p.clear + 4, 'Round', 2, 64)), 3)).translate([0, 0, z0 - 3]));
+    const fenceCS = keep(keep(filled.offset(p.clear + 2, 'Round', 2, 64)).subtract(keep(filled.offset(p.clear, 'Round', 2, 64))));
+    const fence = keep(keep(M.Manifold.extrude(fenceCS, 3)).translate([0, 0, z0]));
+    let baseM = keep(plate.add(fence));
+    // Marca de centrado del master: hueco de 0,8 mm con su huella
+    const print = keep(master.slice(z0 + 0.3));
+    if (!print.isEmpty()) {
+      const recess = keep(keep(M.Manifold.extrude(keep(print.offset(p.clear, 'Round', 2, 48)), 0.8)).translate([0, 0, z0 - 0.8]));
+      baseM = keep(baseM.subtract(recess));
     }
 
-    // 10) Verificaciones: cavidad real y no un bloque
-    if (A.isEmpty() || B.isEmpty()) throw new Error('Una de las mitades quedó vacía. Mueve la línea de partición.');
-    const vOuter = outer.volume(), vShellOuter = shellOuter.volume();
-    if (!(shell.volume() < vShellOuter - 0.9 * vOuter)) throw new Error('El shell no tiene cavidad. No se exportará un bloque sólido.');
+    // 8) Verificaciones: cavidad real, no un bloque
+    if (A.isEmpty() || B.isEmpty()) throw new Error('Una de las mitades quedó vacía. Mueve el corte hacia el centro.');
+    const vOuter = outerFull.volume();
+    if (!(shell.volume() < solid.volume() - 0.9 * vOuter)) throw new Error('El shell no tiene cavidad. No se exportará un bloque sólido.');
     const touch = keep(master.intersect(keep(A.add(B))));
     if (touch.volume() > 0.001 * vMaster) out.warnings.push('El master toca el shell. Aumenta el grosor de silicona.');
 
-    const boxVol = (sz.x + 2 * p.sil) * (sz.y + 2 * p.sil) * (sz.z + 2 * p.sil);
-    out.A = manifoldToGeometry(A); out.B = manifoldToGeometry(B);
+    const boxVol = (sz.x + 2 * p.sil) * (sz.y + 2 * p.sil) * (sz.z + p.sil);
+    out.A = manifoldToGeometry(A); out.B = manifoldToGeometry(B); out.base = manifoldToGeometry(baseM);
     out.silA = manifoldToGeometry(silA); out.silB = manifoldToGeometry(silB);
-    out.plugGeom = manifoldToGeometry(plug);
     out.masterGeom = manifoldToGeometry(master);
-    const bb = new THREE.Box3().setFromBufferAttribute(out.A.getAttribute('position')).union(new THREE.Box3().setFromBufferAttribute(out.B.getAttribute('position')));
+    const bb = new THREE.Box3();
+    for (const g of [out.A, out.B, out.base]) bb.union(new THREE.Box3().setFromBufferAttribute(g.getAttribute('position')));
     out.stats = {
-      outer: bb.getSize(new THREE.Vector3()), scale: p.scale, zp,
+      outer: bb.getSize(new THREE.Vector3()), scale: p.scale, d, axis: ax,
       silMl: (vOuter - vMaster) / 1000, boxMl: (boxVol - vMaster) / 1000,
-      shellMl: (A.volume() + B.volume()) / 1000,
+      shellMl: (A.volume() + B.volume() + baseM.volume()) / 1000,
     };
     out.ok = true;
   } catch (e) {
@@ -755,8 +783,9 @@ const METHOD_TXT = {
   escala: 'Respaldo: escalado desde el centroide y suavizado. El grosor de silicona no es uniforme.',
 };
 function showResult() {
-  clearGroup(groups.A); clearGroup(groups.B);
+  clearGroup(groups.A); clearGroup(groups.B); clearGroup(groups.base);
   if (!result?.ok) return;
+  groups.base.add(new THREE.Mesh(result.base, matBase));
   groups.A.add(new THREE.Mesh(result.A, matA), new THREE.Mesh(result.silA, matSil));
   groups.B.add(new THREE.Mesh(result.B, matB), new THREE.Mesh(result.silB, matSil));
   groups.A.children[1].name = groups.B.children[1].name = 'silicone';
@@ -782,14 +811,16 @@ function syncVisibility() {
 }
 function applyExplode() {
   const e = +$('explode').value;
-  groups.A.position.z = -e / 2; groups.B.position.z = e / 2;
+  const k = state.axis === 'X' ? 'x' : 'y';
+  groups.A.position.set(0, 0, 0); groups.B.position.set(0, 0, 0);
+  groups.A.position[k] = -e / 2; groups.B.position[k] = e / 2;
   groups.master.position.z = 0;
   updatePreview();
 }
 
 /* ---------- Invalidación y exportación ---------- */
 function invalidate() {
-  if (result) { result = null; clearGroup(groups.A); clearGroup(groups.B); showMaster(); $('genMsgs').innerHTML = ''; $('genMsgs').append(note('warn', 'Cambiaste un parámetro. Vuelve a <b>Generar Molde</b>.')); }
+  if (result) { result = null; clearGroup(groups.A); clearGroup(groups.B); clearGroup(groups.base); showMaster(); $('genMsgs').innerHTML = ''; $('genMsgs').append(note('warn', 'Cambiaste un parámetro. Vuelve a <b>Generar Molde</b>.')); }
   for (const id of ['rsOuter', 'rsSil', 'rsSilW', 'rsBox', 'rsSave', 'rsShell', 'rsMethod']) $(id).textContent = id === 'rsMethod' ? '' : '—';
   if (model) $('rsScale').textContent = '×' + params().scale.toFixed(4);
   updatePreview(); refreshExport();
@@ -806,9 +837,10 @@ function refreshExport() {
   st.style.color = enabled ? 'var(--ok)' : 'var(--muted)';
 }
 
-function stlBytes(geom, flipForPrint) {
+function stlBytes(geom, rot) {
   const g = geom.clone();
-  if (flipForPrint) g.rotateX(Math.PI);
+  if (rot?.x) g.rotateX(rot.x);
+  if (rot?.y) g.rotateY(rot.y);
   g.computeBoundingBox();
   const c = new THREE.Vector3(); g.boundingBox.getCenter(c);
   g.translate(-c.x, -c.y, -g.boundingBox.min.z); // apoyado en la cama
@@ -819,10 +851,11 @@ function stlBytes(geom, flipForPrint) {
 function filesFor(which) {
   const base = (model.name || 'master').replace(/\.stl$/i, '').replace(/[^\w\-]+/g, '_');
   const f = {
-    A: () => ({ name: 'Shell_A.stl', data: stlBytes(result.A, false) }),
-    B: () => ({ name: 'Shell_B.stl', data: stlBytes(result.B, true) }),
-    plug: () => ({ name: 'Tapon_Reservorio.stl', data: stlBytes(result.plugGeom, true) }),
-    master: () => ({ name: `${base}_escalado.stl`, data: stlBytes(result.masterGeom, false) }),
+    // cada mitad se acuesta sobre la cara del corte (brida plana sobre la cama)
+    A: () => ({ name: 'Shell_A.stl', data: stlBytes(result.A, result.stats.axis === 'X' ? { y: Math.PI / 2 } : { x: -Math.PI / 2 }) }),
+    B: () => ({ name: 'Shell_B.stl', data: stlBytes(result.B, result.stats.axis === 'X' ? { y: -Math.PI / 2 } : { x: Math.PI / 2 }) }),
+    base: () => ({ name: 'Base.stl', data: stlBytes(result.base) }),
+    master: () => ({ name: `${base}_escalado.stl`, data: stlBytes(result.masterGeom) }),
   };
   return which === 'all' ? Object.values(f).map(fn => fn()) : [f[which]()];
 }
@@ -882,10 +915,8 @@ function updateOutputs() {
   $('wallOut').textContent = (+$('wall').value).toFixed(1) + ' mm';
   $('gapOut').textContent = (+$('gap').value).toFixed(1) + ' mm';
   $('clearOut').textContent = (+$('clear').value).toFixed(2) + ' mm';
-  $('partOut').textContent = (+$('part').value).toFixed(1) + ' mm';
-  $('wickXOut').textContent = (+$('wickX').value).toFixed(1) + ' mm';
-  $('wickYOut').textContent = (+$('wickY').value).toFixed(1) + ' mm';
-  $('funnelOut').textContent = 'Ø ' + (+$('funnel').value).toFixed(1) + ' mm';
+  $('partOut').textContent = ((+$('part').value) > 0 ? '+' : '') + (+$('part').value).toFixed(1) + ' mm';
+  for (const id of ['rotX', 'rotY', 'rotZ']) $(id + 'Out').textContent = (+$(id).value) + '°';
   $('explodeOut').textContent = (+$('explode').value) + ' mm';
 }
 function updateNotes() {
@@ -900,18 +931,30 @@ document.querySelectorAll('.seg').forEach(seg => {
   seg.addEventListener('click', (ev) => {
     const b = ev.target.closest('button'); if (!b) return;
     const key = seg.dataset.group;
+    if (!key) return;
     state[key] = b.dataset.v;
     seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
     if (key === 'silicone') { $('clear').value = SILICONE[state.silicone].clearance; updateOutputs(); }
     if (key === 'master') { $('clear').value = 0.4; updateOutputs(); }
     updateNotes();
     if (key === 'silicone') { showMaster(); invalidate(); }
+    if (key === 'axis') { setPartRange(); invalidate(); }
   });
 });
-for (const id of ['wall', 'gap', 'clear', 'part', 'wickX', 'wickY', 'funnel']) {
+for (const id of ['wall', 'gap', 'clear', 'part']) {
   $(id).addEventListener('input', () => { updateOutputs(); invalidate(); });
 }
 for (const id of ['keys']) $(id).addEventListener('change', invalidate);
+let rotTimer = null;
+for (const id of ['rotX', 'rotY', 'rotZ']) $(id).addEventListener('input', () => {
+  updateOutputs(); clearTimeout(rotTimer); rotTimer = setTimeout(applyOrientation, 120);
+});
+$('rotBtns').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b || !model) return;
+  if (b.dataset.rot === 'reset') for (const id of ['rotX', 'rotY', 'rotZ']) $(id).value = 0;
+  else { const el = $(b.dataset.rot); let v = +el.value + 90; if (v > 180) v -= 360; el.value = v; }
+  updateOutputs(); applyOrientation();
+});
 $('explode').addEventListener('input', () => { updateOutputs(); applyExplode(); });
 $('showMaster').addEventListener('change', () => groups.master.visible = $('showMaster').checked);
 $('showShell').addEventListener('change', syncVisibility);
@@ -922,28 +965,6 @@ $('solidShell').addEventListener('change', () => {
 });
 document.querySelectorAll('.prep').forEach(c => c.addEventListener('change', refreshExport));
 document.querySelectorAll('.exp').forEach(b => b.addEventListener('click', () => doExport(b.dataset.file)));
-
-$('pickWick').addEventListener('click', () => {
-  pickMode = !pickMode;
-  $('pickWick').setAttribute('aria-pressed', String(pickMode));
-  $('pickWick').textContent = pickMode ? 'Haz clic sobre el master…' : 'Colocar la boca con clic en el modelo';
-  $('pickWick').style.borderColor = pickMode ? 'var(--accent)' : '';
-});
-let downAt = null;
-renderer.domElement.addEventListener('pointerdown', (e) => { downAt = [e.clientX, e.clientY]; });
-renderer.domElement.addEventListener('pointerup', (e) => {
-  if (!pickMode || !model || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
-  const r = renderer.domElement.getBoundingClientRect();
-  const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-  const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, camera);
-  const m = groups.master.children.find(c => c.name === 'master');
-  const hit = m && ray.intersectObject(m, false)[0];
-  if (!hit) return;
-  const s = params().scale;
-  $('wickX').value = (hit.point.x / s).toFixed(1); $('wickY').value = (hit.point.y / s).toFixed(1);
-  pickMode = false; $('pickWick').setAttribute('aria-pressed', 'false'); $('pickWick').textContent = 'Colocar la boca con clic en el modelo'; $('pickWick').style.borderColor = '';
-  updateOutputs(); invalidate();
-});
 
 $('fileInput').addEventListener('change', async (e) => {
   const f = e.target.files[0]; if (!f) return;
@@ -973,7 +994,7 @@ $('genBtn').addEventListener('click', async () => {
   }
   result = r;
   showResult(); refreshExport();
-  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Partición a ${fmt(r.stats.zp - layout(params()).mMin.z, 1)} mm de la base del master. ${r.keys} llaves de registro. Cierra la brida (6 mm de grueso) con pinzas sujetadocumentos de 25 mm o más.`));
+  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Corte vertical ${r.stats.axis === 'X' ? 'izquierda | derecha' : 'frente | atrás'}, ${r.keys} llaves de registro. Cierra la brida (6 mm de grueso) con pinzas sujetadocumentos de 25 mm o más.`));
   if (r.method === 'escala') msgs.append(note('warn', '<b>Se usó el método de respaldo:</b> el offset por normales falló, la silicona se calculó escalando el modelo desde su centroide y suavizando. El grosor no es uniforme; revisa la vista previa.'));
   for (const w of r.warnings) msgs.append(note('warn', w));
 });
