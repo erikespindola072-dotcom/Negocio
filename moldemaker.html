@@ -167,13 +167,21 @@ label.check:has(input:checked){border-color:var(--ok)}
       <section class="panel flex flex-col gap-4" aria-labelledby="h-dim">
         <div class="step">Paso 3</div>
         <h2 id="h-dim" class="text-lg font-bold">Molde conforme</h2>
-        <p class="hint">El master se pega sobre un disco de base y queda de pie. El molde sigue la forma del master con pared delgada, se abre con un corte vertical y solo la brida del corte es plana, para las pinzas. La silicona entra por el embudo de arriba.</p>
+        <p class="hint">El master se pega sobre un disco de base y queda de pie. El molde es una cáscara delgada que sigue su forma, con costillas por fuera, se abre en 2 o 4 piezas con cortes verticales y queda abierto arriba para verter la silicona.</p>
         <div class="range-row"><label class="label" for="wall">Grosor de pared</label><output id="wallOut" for="wall"></output>
           <input id="wall" type="range" min="2" max="4" step="0.1" value="2.5"></div>
         <div class="range-row"><label class="label" for="gap">Grosor de silicona</label><output id="gapOut" for="gap"></output>
           <input id="gap" type="range" min="6" max="12" step="0.5" value="8"></div>
         <div class="range-row"><label class="label" for="clear">Holgura FDM</label><output id="clearOut" for="clear"></output>
           <input id="clear" type="range" min="0.1" max="0.8" step="0.05" value="0.4"></div>
+        <div class="flex flex-col gap-2">
+          <span class="label">Número de piezas</span>
+          <div class="seg" data-group="parts">
+            <button type="button" data-v="2" aria-pressed="true">2 piezas</button>
+            <button type="button" data-v="4" aria-pressed="false">4 piezas (corte en cruz)</button>
+          </div>
+          <span class="hint">4 piezas ayuda a desmoldar figuras grandes o con muchas salientes.</span>
+        </div>
         <div class="flex flex-col gap-2">
           <span class="label">Dirección del corte vertical</span>
           <div class="seg" data-group="axis">
@@ -185,7 +193,8 @@ label.check:has(input:checked){border-color:var(--ok)}
           <input id="part" type="range" min="-50" max="50" step="0.5" value="0"></div>
         <div class="range-row"><label class="label" for="baseH">Grosor del disco de base</label><output id="baseHOut" for="baseH"></output>
           <input id="baseH" type="range" min="3" max="10" step="0.5" value="5"></div>
-        <label class="switch" for="keys"><span><span class="label">Llaves de registro (4 esféricas Ø5 mm)</span><br><span class="hint">En la brida plana de 12 mm del corte, donde también van las pinzas sujetadocumentos.</span></span><input id="keys" type="checkbox" checked></label>
+        <label class="switch" for="ribs"><span><span class="label">Costillas de refuerzo</span><br><span class="hint">Aletas de 3 mm por fuera: dan rigidez a la cáscara delgada y la ayudan a pararse.</span></span><input id="ribs" type="checkbox" checked></label>
+        <label class="switch" for="keys"><span><span class="label">Llaves de registro (4 esféricas Ø5 mm)</span><br><span class="hint">En las bridas planas de 12 mm de los cortes, que se cierran con grapas impresas o pinzas sujetadocumentos.</span></span><input id="keys" type="checkbox" checked></label>
       </section>
 
       <button type="button" class="btn btn-primary" id="genBtn" disabled>Generar Molde</button>
@@ -242,23 +251,23 @@ label.check:has(input:checked){border-color:var(--ok)}
         <div class="step">Paso 6</div>
         <h2 id="h-exp" class="text-lg font-bold">Exportar STL</h2>
         <p class="hint" id="exportState">Genera el molde para habilitar la descarga.</p>
-        <button type="button" class="btn btn-primary exp" data-file="A" disabled>Descargar Shell_A.stl</button>
-        <button type="button" class="btn btn-primary exp" data-file="B" disabled>Descargar Shell_B.stl</button>
-        <button type="button" class="btn btn-primary exp" data-file="base" disabled>Descargar Base_master.stl</button>
+        <button type="button" class="btn btn-primary exp" data-file="all" disabled>Descargar molde completo (.zip)</button>
+        <button type="button" class="btn btn-ghost exp" data-file="pieces" disabled>Solo piezas del molde</button>
+        <button type="button" class="btn btn-ghost exp" data-file="base" disabled>Base_master.stl</button>
+        <button type="button" class="btn btn-ghost exp" data-file="clip" disabled>Grapa.stl</button>
         <button type="button" class="btn btn-ghost exp" data-file="master" disabled>Master escalado (.stl)</button>
-        <button type="button" class="btn btn-ghost exp" data-file="all" disabled>Todo en un .zip</button>
-        <p class="hint">STL binario en mm. Shell A y B se exportan acostados sobre la cara del corte; la base del master, tal cual. Dentro de Claude los STL se entregan en un .zip.</p>
+        <p class="hint">STL binario en mm. El .zip trae las piezas, la base del master, la grapa y el master escalado. Con 2 piezas, cada una sale acostada sobre la cara del corte; con 4, de pie sobre su base. Dentro de Claude los STL se entregan en un .zip.</p>
         <div id="expMsgs" class="flex flex-col gap-2"></div>
       </section>
 
       <section class="panel flex flex-col gap-3" aria-labelledby="h-how">
         <h2 id="h-how" class="text-lg font-bold">Cómo hacer el molde</h2>
         <ol class="steps">
-          <li>Imprime Shell A, Shell B y la base del master en PETG (3–4 perímetros, 20 % relleno).</li>
+          <li>Imprime las piezas del molde, la base del master y las grapas en PETG (3–4 perímetros, 20 % relleno).</li>
           <li>Pega el master sobre el disco de base, dentro de la marca de centrado.</li>
-          <li>Pon el master con su disco en una mitad (el disco entra en su hueco de abajo), cierra con la otra mitad usando las llaves y sujeta la brida con 6–8 pinzas sujetadocumentos de 25 mm o más.</li>
-          <li>Para el molde sobre la mesa y vierte la silicona por el embudo de arriba hasta que salga por el respiradero. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
-          <li>Quita las pinzas, abre el molde y saca la silicona con el master; córtala en zigzag si hace falta para sacarlo. Donde estaba el disco queda la boca de tu molde.</li>
+          <li>Arma las piezas alrededor del master con las llaves (el disco entra en su hueco de abajo) y cierra las bridas con las grapas o con pinzas sujetadocumentos.</li>
+          <li>Para el molde y vierte la silicona por la boca de arriba, despacio y por un costado, hasta el borde. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
+          <li>Quita las grapas, separa las piezas y saca la silicona con el master; córtala en zigzag si hace falta. Donde estaba el disco queda la boca de tu molde.</li>
         </ol>
       </section>
     </div>
@@ -295,7 +304,7 @@ const SILICONE = {
   P10: { name: 'Platino Shore 10', scale: 1.001, clearance: 0.4, note: 'Muy blanda, ideal para figuras con detalle profundo.' },
   T30: { name: 'Estaño Shore 30', scale: 1.008, clearance: 0.4, note: 'Más rígida y encoge un poco más.' },
 };
-const state = { master: 'PLA', shellMat: 'PETG', silicone: 'P15', axis: 'X' };
+const state = { master: 'PLA', shellMat: 'PETG', silicone: 'P15', axis: 'X', parts: 2 };
 
 /* ---------- Motor manifold-3d (WASM incrustado) ---------- */
 let M = null;
@@ -331,7 +340,7 @@ const matSil = new THREE.MeshStandardMaterial({ color: 0xe58fb0, roughness: 0.7,
 const matBase = new THREE.MeshStandardMaterial({ color: 0x9aa3a6, roughness: 0.6 });
 const matPlane = new THREE.MeshBasicMaterial({ color: 0xd9822b, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
 
-const groups = { master: new THREE.Group(), preview: new THREE.Group(), A: new THREE.Group(), B: new THREE.Group(), base: new THREE.Group() };
+const groups = { master: new THREE.Group(), preview: new THREE.Group(), pieces: new THREE.Group(), base: new THREE.Group() };
 Object.values(groups).forEach(g => scene.add(g));
 
 function resize() {
@@ -461,7 +470,7 @@ function params() {
   return {
     scale,
     wall: +$('wall').value, sil: +$('gap').value, clear: +$('clear').value,
-    part: +$('part').value, keys: $('keys').checked, baseH: +$('baseH').value,
+    part: +$('part').value, keys: $('keys').checked, baseH: +$('baseH').value, parts: state.parts, ribs: $('ribs').checked,
   };
 }
 // Caja del master escalado (escala sobre el origen) — solo para medidas y comparación
@@ -488,12 +497,16 @@ function updatePreview() {
   const p = params(), L = layout(p);
   const size = L.mMax.clone().sub(L.mMin);
   if (!result) {
-    const tang = (state.axis === 'X' ? size.y : size.x) + 2 * (p.sil + p.wall + 14), h = size.z + p.sil + 16;
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(state.axis === 'X' ? h : tang, state.axis === 'X' ? tang : h), matPlane);
-    const cz = (L.mMin.z + L.mMax.z + p.sil) / 2;
-    if (state.axis === 'X') { plane.rotation.y = Math.PI / 2; plane.position.set(L.d, (L.mMin.y + L.mMax.y) / 2, cz); }
-    else { plane.rotation.x = Math.PI / 2; plane.position.set((L.mMin.x + L.mMax.x) / 2, L.d, cz); }
-    groups.preview.add(plane);
+    const cz = (L.mMin.z + L.mMax.z + p.sil) / 2, h = size.z + p.sil + 16;
+    const mcx = (L.mMin.x + L.mMax.x) / 2, mcy = (L.mMin.y + L.mMax.y) / 2;
+    const list = state.parts === 4 ? [['X', state.axis === 'X' ? L.d : mcx], ['Y', state.axis === 'Y' ? L.d : mcy]] : [[state.axis, L.d]];
+    for (const [a, dd] of list) {
+      const tang = (a === 'X' ? size.y : size.x) + 2 * (p.sil + p.wall + 14);
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(a === 'X' ? h : tang, a === 'X' ? tang : h), matPlane);
+      if (a === 'X') { plane.rotation.y = Math.PI / 2; plane.position.set(dd, mcy, cz); }
+      else { plane.rotation.x = Math.PI / 2; plane.position.set(mcx, dd, cz); }
+      groups.preview.add(plane);
+    }
   }
 }
 
@@ -697,98 +710,138 @@ function generate() {
       disc = keep(disc.subtract(keep(keep(M.Manifold.extrude(keep(print.offset(p.clear, 'Round', 2, 48)), 0.8)).translate([0, 0, z0 - 0.8]))));
     }
 
-    // 4) Cavidad = silicona desde la base hacia arriba
-    const cavity = keep(outer.trimByPlane([0, 0, 1], z0));
+    // 4) Boca abierta arriba: por encima del master las paredes suben rectas hasta zTop,
+    //    así la silicona se vierte directo por arriba y lo cubre con el mismo grosor.
+    const zc = L.mMax.z, zTop = L.mMax.z + p.sil;
+    const chimney = (m, extra) => keep(keep(M.Manifold.extrude(keep(m.slice(zc - 0.05)), zTop - zc + extra)).translate([0, 0, zc - 0.05]));
+    const between = (m, lo, hi) => keep(keep(m.trimByPlane([0, 0, -1], -hi)).trimByPlane([0, 0, 1], lo));
+    const outerTall = keep(keep(outer.add(chimney(outer, 8))).trimByPlane([0, 0, 1], z0)); // sobresale arriba: deja la boca abierta
+    const cavity = between(outerTall, z0, zTop);
     const silicone = keep(cavity.subtract(master));
 
-    // 5) Shell ajustado: OUTER + pared PETG (sigue la forma del master), con alojamiento para el disco
-    const toF = ax === 'X' ? [0, -90, 0] : [90, 0, 0], fromF = ax === 'X' ? [0, 90, 0] : [-90, 0, 0];
-    const toUZ = (pt) => ax === 'X' ? [pt[1], -pt[0]] : [pt[0], -pt[1]];
-    const at = (u, z, s) => ax === 'X' ? [s, u, z] : [u, s, z];
+    // 5) Cáscara delgada que sigue la forma + aro que abraza el disco
     const o2 = o1.method === 'distancia'
       ? { man: field(p.sil + p.wall), method: 'distancia' }
       : offsetSurface(outer, outer, p.wall, () => field(p.sil + p.wall));
     if (o2.method === 'escala') out.method = 'escala';
     const shellOuter = keep(o2.man);
-    let solid = keep(shellOuter.add(keep(cylZ(R + p.clear + p.wall, zBot, z0 + p.wall, cx, cy, 96))));
-    solid = keep(solid.trimByPlane([0, 0, 1], zBot));
-    const zMax = solid.boundingBox().max[2];
+    let solid = keep(keep(shellOuter.add(chimney(shellOuter, 2))).add(keep(cylZ(R + p.clear + p.wall, zBot, z0 + p.wall, cx, cy, 96))));
+    solid = between(solid, zBot, zTop);
 
-    // 6) Embudo arriba (con cuello) y respiradero, centrados en el corte
-    const cutF = keep(keep(cavity.rotate(toF)).slice(d));
-    if (cutF.isEmpty()) throw new Error('El corte vertical no atraviesa el modelo. Mueve la posición del corte.');
-    const cpts = [];
-    for (const poly of cutF.toPolygons()) for (const pt of poly) cpts.push(toUZ([pt[0] ?? pt.x, pt[1] ?? pt.y]));
-    const top = cpts.reduce((a, b) => (b[1] > a[1] ? b : a));
-    const fz0 = top[1] - 1, fz1 = zMax + 10, fc = at(top[0], fz0, d);
-    const cone = (r0, r1) => keep(keep(M.Manifold.cylinder(fz1 - fz0, r0, r1, 48)).translate(fc));
-    solid = keep(solid.add(cone(3 + p.wall, 10 + p.wall)));
-    const funnel = cone(3, 10);
-    const ventPt = cpts.filter(q => Math.abs(q[0] - top[0]) > 15 && q[1] > zBot + 0.5 * (zMax - zBot)).reduce((a, b) => (!a || b[1] > a[1] ? b : a), null);
-    let vent = null;
-    if (ventPt) {
-      const v = at(ventPt[0], 0, d), vz1 = ventPt[1] + p.sil + p.wall + 4;
-      solid = keep(solid.add(keep(cylZ(1.5 + p.wall, ventPt[1] - 1, vz1, v[0], v[1], 24))));
-      vent = keep(cylZ(1.5, ventPt[1] - 1, vz1 + 1, v[0], v[1], 24));
+    // 6) Planos de corte verticales: 2 piezas (un corte) o 4 piezas (dos cortes en cruz)
+    const mcx = (L.mMin.x + L.mMax.x) / 2, mcy = (L.mMin.y + L.mMax.y) / 2;
+    const planes = p.parts === 4
+      ? [{ ax: 'X', d: ax === 'X' ? d : mcx }, { ax: 'Y', d: ax === 'Y' ? d : mcy }]
+      : [{ ax, d }];
+    const FW = 12, FT = 3, KR = 2.5;
+
+    // 7) Costillas de refuerzo por fuera (3 mm), radiales, sin tocar los cortes
+    if (p.ribs) {
+      const sb = solid.boundingBox(), Lr = Math.hypot(sb.max[0] - sb.min[0], sb.max[1] - sb.min[1]);
+      const env = keep(boxM([sb.min[0], sb.min[1], zBot], [sb.max[0], sb.max[1], zTop]));
+      const angles = p.parts === 4 ? [45, 135, 225, 315] : (ax === 'X' ? [0, 45, 135, 180, 225, 315] : [45, 90, 135, 225, 270, 315]);
+      for (const a of angles) {
+        const rib = keep(keep(keep(keep(boxM([0, -1.5, zBot], [Lr, 1.5, zTop])).rotate([0, 0, a])).translate([mcx, mcy, 0])).intersect(env));
+        solid = keep(solid.add(rib));
+      }
     }
-    out.vent = !!ventPt;
 
-    // 7) Brida plana en el corte: lo único plano, 12 mm hacia afuera y 3 mm por mitad, para las pinzas
-    const FW = 12, FT = 3;
-    const solidF = keep(solid.rotate(toF)), cavF = keep(cavity.rotate(toF));
-    const sliceF = keep(solidF.slice(d));
-    const ring = keep(sliceF.offset(FW, 'Round', 2, 64));
-    const flange = (lo) => keep(keep(keep(keep(keep(M.Manifold.extrude(ring, FT)).translate([0, 0, lo])).subtract(cavF)).rotate(fromF)).trimByPlane([0, 0, 1], zBot));
-    const fA = flange(d - FT), fB = flange(d);
-
-    // 8) Restar cavidad, hueco del disco, embudo y respiradero
-    let shell = keep(solid.subtract(cavity));
-    shell = keep(shell.subtract(keep(cylZ(R + p.clear, zBot - 1, z0 + 0.01, cx, cy, 96))));
-
-    // 9) Dividir en dos mitades por el plano vertical y sumar su brida
-    const n = ax === 'X' ? [1, 0, 0] : [0, 1, 0], nn = n.map(v => -v);
-    let A = keep(keep(shell.trimByPlane(nn, -d)).add(fA)), B = keep(keep(shell.trimByPlane(n, d)).add(fB));
-    for (const cut of [funnel, vent].filter(Boolean)) { A = keep(A.subtract(cut)); B = keep(B.subtract(cut)); }
-    A = keep(A.subtract(keep(cylZ(R + p.clear, zBot - 1, z0 + 0.01, cx, cy, 96))));
-    B = keep(B.subtract(keep(cylZ(R + p.clear, zBot - 1, z0 + 0.01, cx, cy, 96))));
-    const silA = keep(silicone.trimByPlane(nn, -d)), silB = keep(silicone.trimByPlane(n, d));
-
-    // 10) Llaves esféricas Ø5 en la brida (macho en A, hembra en B), en sus 4 esquinas
-    const KR = 2.5;
-    const kc = [];
-    for (const poly of keep(sliceF.offset(FW / 2, 'Round', 2, 64)).toPolygons()) for (const pt of poly) {
-      const q = toUZ([pt[0] ?? pt.x, pt[1] ?? pt.y]);
-      if (q[1] > zBot + 5 && q[1] < zMax - 5 && Math.abs(q[0] - top[0]) > 14) kc.push(q);
+    // 8) Bridas planas de cada corte (12 mm hacia afuera, 3 mm por lado) y llaves esféricas Ø5
+    const toF = (a) => a === 'X' ? [0, -90, 0] : [90, 0, 0], fromF = (a) => a === 'X' ? [0, 90, 0] : [-90, 0, 0];
+    const toUZ = (a, pt) => a === 'X' ? [pt[1], -pt[0]] : [pt[0], -pt[1]];
+    const at = (a, u, z, s) => a === 'X' ? [s, u, z] : [u, s, z];
+    const nrm = (a) => a === 'X' ? [1, 0, 0] : [0, 1, 0];
+    const side = (m, pl, s) => keep(s < 0 ? m.trimByPlane(nrm(pl.ax).map(v => -v), -pl.d) : m.trimByPlane(nrm(pl.ax), pl.d));
+    let seam = 0;
+    for (const pl of planes) {
+      const sF = keep(keep(solid.rotate(toF(pl.ax))).slice(pl.d));
+      if (sF.isEmpty()) throw new Error('Un corte vertical no atraviesa el modelo. Mueve la posición del corte.');
+      const cavF = keep(outerTall.rotate(toF(pl.ax)));
+      const ring = keep(sF.offset(FW, 'Round', 2, 64));
+      const fl = (lo) => between(keep(keep(keep(keep(M.Manifold.extrude(ring, FT)).translate([0, 0, lo])).subtract(cavF)).rotate(fromF(pl.ax))), zBot, zTop);
+      pl.flange = { '-1': fl(pl.d - FT), '1': fl(pl.d) };
+      const kc = [];
+      for (const poly of keep(sF.offset(FW / 2, 'Round', 2, 64)).toPolygons()) {
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i], b = poly[(i + 1) % poly.length];
+          seam += Math.hypot((a[0] ?? a.x) - (b[0] ?? b.x), (a[1] ?? a.y) - (b[1] ?? b.y));
+          const q = toUZ(pl.ax, [a[0] ?? a.x, a[1] ?? a.y]);
+          if (q[1] > zBot + 5 && q[1] < zTop - 3) kc.push(q);
+        }
+      }
+      const other = planes.find(o => o !== pl);
+      const usable = other ? kc.filter(q => Math.abs(q[0] - other.d) > KR + 8) : kc;
+      pl.keys = [];
+      for (const [du, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+        const pt = extremePoint([usable], du, dz);
+        if (pt && pl.keys.every(k => Math.hypot(k[0] - pt[0], k[1] - pt[1]) > 12)) pl.keys.push(pt);
+      }
     }
-    const keyPts = [];
-    for (const [du, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-      const pt = extremePoint([kc], du, dz);
-      if (pt && keyPts.every(k => Math.hypot(k[0] - pt[0], k[1] - pt[1]) > 12)) keyPts.push(pt);
-    }
-    if (p.keys) for (const [u, z] of keyPts) {
-      const c = at(u, z, d);
-      A = keep(A.add(keep(keep(M.Manifold.sphere(KR, 32)).translate(c))));
-      B = keep(B.subtract(keep(keep(M.Manifold.sphere(KR + p.clear, 32)).translate(c))));
-    }
-    out.keys = p.keys ? keyPts.length : 0;
+    seam /= 2; // el contorno medio cuenta las dos caras de la brida
 
-    // 11) Verificaciones: cavidad real, no un bloque
-    if (A.isEmpty() || B.isEmpty()) throw new Error('Una de las mitades quedó vacía. Mueve el corte hacia el centro.');
+    // 9) Restar cavidad (con la boca abierta) y el hueco del disco
+    let shell = keep(solid.subtract(outerTall));
+    const pocket = keep(cylZ(R + p.clear, zBot - 1, z0 + 0.01, cx, cy, 96));
+    shell = keep(shell.subtract(pocket));
+
+    // 10) Piezas: cada combinación de lados de los cortes, con sus bridas y llaves
+    const combos = planes.length === 2 ? [[-1, -1], [1, -1], [1, 1], [-1, 1]] : [[-1], [1]];
+    const pieces = combos.map((sg, i) => {
+      let m = shell, sil = silicone;
+      planes.forEach((pl, k) => { m = side(m, pl, sg[k]); sil = side(sil, pl, sg[k]); });
+      planes.forEach((pl, k) => {
+        let f = pl.flange[String(sg[k])];
+        planes.forEach((o, j) => { if (j !== k) f = side(f, o, sg[j]); });
+        m = keep(m.add(f));
+      });
+      return { sg, m, sil, name: planes.length === 2 ? `Shell_${i + 1}.stl` : (i === 0 ? 'Shell_A.stl' : 'Shell_B.stl') };
+    });
+    let nKeys = 0;
+    if (p.keys) planes.forEach((pl, k) => {
+      const other = planes.find(o => o !== pl), oi = planes.indexOf(other);
+      for (const [u, z] of pl.keys) {
+        const so = other ? (u < other.d ? -1 : 1) : 0;
+        const c = at(pl.ax, u, z, pl.d);
+        for (const pc of pieces) {
+          if (other && pc.sg[oi] !== so) continue;
+          if (pc.sg[k] < 0) pc.m = keep(pc.m.add(keep(keep(M.Manifold.sphere(KR, 32)).translate(c))));
+          else pc.m = keep(pc.m.subtract(keep(keep(M.Manifold.sphere(KR + p.clear, 32)).translate(c))));
+        }
+        nKeys++;
+      }
+    });
+    out.keys = nKeys;
+
+    // 11) Grapa impresa en U para cerrar la brida (6 mm), alternativa a las pinzas
+    const gap = 2 * FT + 0.25, cw = 2.4, cl = 10, cd = 11;
+    const clip = keep(keep(boxM([0, 0, 0], [cl, gap + 2 * cw, cd + cw])).subtract(keep(boxM([-1, cw, cw], [cl + 1, cw + gap, cd + cw + 1]))));
+    out.clips = Math.max(6, Math.round(seam / 35));
+
+    // 12) Verificaciones: cavidad real, no un bloque
+    if (pieces.some(pc => pc.m.isEmpty())) throw new Error('Una pieza quedó vacía. Mueve el corte hacia el centro.');
     const vCav = cavity.volume();
     if (!(shell.volume() < solid.volume() - 0.8 * vCav)) throw new Error('El molde no tiene cavidad. No se exportará un bloque sólido.');
-    const touch = keep(master.intersect(keep(A.add(B))));
+    let all = pieces[0].m; for (const pc of pieces.slice(1)) all = keep(all.add(pc.m));
+    const touch = keep(master.intersect(all));
     if (touch.volume() > 0.001 * vMaster) out.warnings.push('El master toca el molde. Aumenta el grosor de silicona.');
 
     const boxVol = (sz.x + 2 * p.sil) * (sz.y + 2 * p.sil) * (sz.z + p.sil);
-    out.A = manifoldToGeometry(A); out.B = manifoldToGeometry(B); out.base = manifoldToGeometry(disc);
-    out.silA = manifoldToGeometry(silA); out.silB = manifoldToGeometry(silB);
+    // orientación para imprimir: 2 piezas acostadas sobre la cara del corte; 4 piezas de pie sobre su base
+    const rot2 = (s) => planes[0].ax === 'X' ? { y: s * -Math.PI / 2 } : { x: s * Math.PI / 2 };
+    out.pieces = pieces.map(pc => ({
+      name: pc.name, geom: manifoldToGeometry(pc.m), sil: manifoldToGeometry(pc.sil),
+      dir: planes.map((pl, k) => nrm(pl.ax).map(v => v * pc.sg[k])).reduce((a, b) => a.map((v, i) => v + b[i]), [0, 0, 0]),
+      rot: planes.length === 1 ? rot2(pc.sg[0]) : null,
+    }));
+    out.base = manifoldToGeometry(disc);
+    out.clipGeom = manifoldToGeometry(clip);
     out.masterGeom = manifoldToGeometry(master);
     const bb = new THREE.Box3();
-    for (const g of [out.A, out.B]) bb.union(new THREE.Box3().setFromBufferAttribute(g.getAttribute('position')));
+    for (const pc of out.pieces) bb.union(new THREE.Box3().setFromBufferAttribute(pc.geom.getAttribute('position')));
     out.stats = {
-      outer: bb.getSize(new THREE.Vector3()), scale: p.scale, d, axis: ax, discD: 2 * R,
+      outer: bb.getSize(new THREE.Vector3()), scale: p.scale, d, axis: ax, parts: pieces.length, discD: 2 * R,
       silMl: (vCav - vMaster) / 1000, boxMl: (boxVol - vMaster) / 1000,
-      shellMl: (A.volume() + B.volume() + disc.volume()) / 1000,
+      shellMl: (all.volume() + disc.volume()) / 1000,
     };
     out.ok = true;
   } catch (e) {
@@ -806,12 +859,16 @@ const METHOD_TXT = {
   escala: 'Respaldo: escalado desde el centroide y suavizado. El grosor de silicona no es uniforme.',
 };
 function showResult() {
-  clearGroup(groups.A); clearGroup(groups.B); clearGroup(groups.base);
+  clearPieces(); clearGroup(groups.base);
   if (!result?.ok) return;
   groups.base.add(new THREE.Mesh(result.base, matBase));
-  groups.A.add(new THREE.Mesh(result.A, matA), new THREE.Mesh(result.silA, matSil));
-  groups.B.add(new THREE.Mesh(result.B, matB), new THREE.Mesh(result.silB, matSil));
-  groups.A.children[1].name = groups.B.children[1].name = 'silicone';
+  result.pieces.forEach((pc, i) => {
+    const g = new THREE.Group(), sil = new THREE.Mesh(pc.sil, matSil);
+    sil.name = 'silicone';
+    g.add(new THREE.Mesh(pc.geom, i % 2 ? matB : matA), sil);
+    g.userData.dir = pc.dir;
+    groups.pieces.add(g);
+  });
   syncVisibility();
   showMaster();
   applyExplode();
@@ -828,22 +885,24 @@ function showResult() {
   $('rsMethod').textContent = METHOD_TXT[result.method];
   $('rsMethod').style.color = result.method === 'escala' ? 'var(--warn)' : 'var(--muted)';
 }
+function clearPieces() {
+  for (const g of groups.pieces.children) for (const c of g.children) c.geometry?.dispose();
+  groups.pieces.clear();
+}
 function syncVisibility() {
   const showSil = $('showSil').checked, showShell = $('showShell').checked;
-  for (const g of [groups.A, groups.B]) for (const c of g.children) c.visible = c.name === 'silicone' ? showSil : showShell;
+  for (const g of groups.pieces.children) for (const c of g.children) c.visible = c.name === 'silicone' ? showSil : showShell;
 }
 function applyExplode() {
   const e = +$('explode').value;
-  const k = state.axis === 'X' ? 'x' : 'y';
-  groups.A.position.set(0, 0, 0); groups.B.position.set(0, 0, 0);
-  groups.A.position[k] = -e / 2; groups.B.position[k] = e / 2;
+  for (const g of groups.pieces.children) { const v = g.userData.dir; g.position.set(v[0] * e / 2, v[1] * e / 2, 0); }
   groups.master.position.z = 0;
   updatePreview();
 }
 
 /* ---------- Invalidación y exportación ---------- */
 function invalidate() {
-  if (result) { result = null; clearGroup(groups.A); clearGroup(groups.B); clearGroup(groups.base); showMaster(); $('genMsgs').innerHTML = ''; $('genMsgs').append(note('warn', 'Cambiaste un parámetro. Vuelve a <b>Generar Molde</b>.')); }
+  if (result) { result = null; clearPieces(); clearGroup(groups.base); showMaster(); $('genMsgs').innerHTML = ''; $('genMsgs').append(note('warn', 'Cambiaste un parámetro. Vuelve a <b>Generar Molde</b>.')); }
   for (const id of ['rsOuter', 'rsSil', 'rsSilW', 'rsBox', 'rsSave', 'rsShell', 'rsMethod']) $(id).textContent = id === 'rsMethod' ? '' : '—';
   if (model) $('rsScale').textContent = '×' + params().scale.toFixed(4);
   updatePreview(); refreshExport();
@@ -874,13 +933,14 @@ function stlBytes(geom, rot) {
 function filesFor(which) {
   const base = (model.name || 'master').replace(/\.stl$/i, '').replace(/[^\w\-]+/g, '_');
   const f = {
-    // cada mitad se acuesta sobre la cara del corte (brida plana sobre la cama)
-    A: () => ({ name: 'Shell_A.stl', data: stlBytes(result.A, result.stats.axis === 'X' ? { y: Math.PI / 2 } : { x: -Math.PI / 2 }) }),
-    B: () => ({ name: 'Shell_B.stl', data: stlBytes(result.B, result.stats.axis === 'X' ? { y: -Math.PI / 2 } : { x: Math.PI / 2 }) }),
     base: () => ({ name: 'Base_master.stl', data: stlBytes(result.base) }),
+    clip: () => ({ name: 'Grapa.stl', data: stlBytes(result.clipGeom) }),
     master: () => ({ name: `${base}_escalado.stl`, data: stlBytes(result.masterGeom) }),
   };
-  return which === 'all' ? Object.values(f).map(fn => fn()) : [f[which]()];
+  const pieces = () => result.pieces.map(pc => ({ name: pc.name, data: stlBytes(pc.geom, pc.rot) }));
+  if (which === 'pieces') return pieces();
+  if (which === 'all') return [...pieces(), f.base(), f.clip(), f.master()];
+  return [f[which]()];
 }
 // ZIP sin compresión (las STL solo se entregan como .zip dentro de Claude)
 const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -915,11 +975,11 @@ async function doExport(which) {
   const dl = await getDownloads();
   try {
     if (dl) {
-      const zipName = which === 'all' ? 'MoldeMaker_molde.zip' : files[0].name.replace(/\.stl$/, '.zip');
+      const zipName = which === 'all' ? 'MoldeMaker_molde.zip' : which === 'pieces' ? 'MoldeMaker_piezas.zip' : files[0].name.replace(/\.stl$/, '.zip');
       await dl.save({ filename: zipName, data: makeZip(files) });
       msgs.append(note('ok', `Guardado <b>${zipName}</b> (${files.map(f => f.name).join(', ')}).`));
     } else {
-      const list = which === 'all' ? [{ name: 'MoldeMaker_molde.zip', blob: makeZip(files) }] : files.map(f => ({ name: f.name, blob: new Blob([f.data], { type: 'model/stl' }) }));
+      const list = files.length > 1 ? [{ name: which === 'all' ? 'MoldeMaker_molde.zip' : 'MoldeMaker_piezas.zip', blob: makeZip(files) }] : files.map(f => ({ name: f.name, blob: new Blob([f.data], { type: 'model/stl' }) }));
       for (const f of list) {
         const a = document.createElement('a'); a.href = URL.createObjectURL(f.blob); a.download = f.name;
         document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
@@ -963,12 +1023,13 @@ document.querySelectorAll('.seg').forEach(seg => {
     updateNotes();
     if (key === 'silicone') { showMaster(); invalidate(); }
     if (key === 'axis') { setPartRange(); invalidate(); }
+    if (key === 'parts') { state.parts = +state.parts; invalidate(); }
   });
 });
 for (const id of ['wall', 'gap', 'clear', 'part', 'baseH']) {
   $(id).addEventListener('input', () => { updateOutputs(); invalidate(); });
 }
-for (const id of ['keys']) $(id).addEventListener('change', invalidate);
+for (const id of ['keys', 'ribs']) $(id).addEventListener('change', invalidate);
 let rotTimer = null;
 for (const id of ['rotX', 'rotY', 'rotZ']) $(id).addEventListener('input', () => {
   updateOutputs(); clearTimeout(rotTimer); rotTimer = setTimeout(applyOrientation, 120);
@@ -1018,7 +1079,7 @@ $('genBtn').addEventListener('click', async () => {
   }
   result = r;
   showResult(); refreshExport();
-  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Corte vertical ${r.stats.axis === 'X' ? 'izquierda | derecha' : 'frente | atrás'}, disco de base Ø${fmt(r.stats.discD, 0)} mm, ${r.keys} llaves esféricas, embudo${r.vent ? ' y respiradero' : ''}. Cierra la brida (6 mm) con pinzas sujetadocumentos de 25 mm o más.`));
+  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. ${r.stats.parts} piezas, disco de base Ø${fmt(r.stats.discD, 0)} mm, ${r.keys} llaves esféricas, boca abierta arriba. Imprime unas ${r.clips} grapas (o usa pinzas sujetadocumentos de 25 mm) para cerrar las bridas.`));
   if (r.method === 'escala') msgs.append(note('warn', '<b>Se usó el método de respaldo:</b> el offset por normales falló, la silicona se calculó escalando el modelo desde su centroide y suavizando. El grosor no es uniforme; revisa la vista previa.'));
   for (const w of r.warnings) msgs.append(note('warn', w));
 });
