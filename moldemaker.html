@@ -160,7 +160,7 @@ label.check:has(input:checked){border-color:var(--ok)}
           <input id="clear" type="range" min="0.1" max="0.8" step="0.05" value="0.4"></div>
         <div class="range-row"><label class="label" for="part">Altura línea de partición</label><output id="partOut" for="part"></output>
           <input id="part" type="range" min="0" max="100" step="0.5" value="50"></div>
-        <label class="switch" for="keys"><span><span class="label">Llaves de registro (4 × Ø5 mm)</span><br><span class="hint">En la brida de 12 mm, junto a 4 agujeros M3 para prensas</span></span><input id="keys" type="checkbox" checked></label>
+        <label class="switch" for="keys"><span><span class="label">Llaves de registro (4 × Ø5 mm)</span><br><span class="hint">En la brida plana de 12 mm, que se cierra con pinzas sujetadocumentos</span></span><input id="keys" type="checkbox" checked></label>
       </section>
 
       <section class="panel flex flex-col gap-4" aria-labelledby="h-wick">
@@ -243,7 +243,7 @@ label.check:has(input:checked){border-color:var(--ok)}
         <h2 id="h-how" class="text-lg font-bold">Cómo hacer el molde</h2>
         <ol class="steps">
           <li>Imprime Shell A y Shell B en PETG (3–4 perímetros, 20 % relleno).</li>
-          <li>Pega el tapón de la boca al master, colócalo dentro y cierra A + B con las llaves y 4 tornillos M3 (o prensas) en la brida.</li>
+          <li>Pega el tapón de la boca al master, colócalo dentro y cierra A + B con las llaves y sujeta la brida con 6–8 pinzas sujetadocumentos de 25 mm o más, repartidas alrededor.</li>
           <li>Vierte silicona platino por el orificio de colada Ø10 hasta que salga por el respiradero. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
           <li>Abre el shell, corta la silicona en zigzag por un lado y saca el master. Tu molde de silicona está listo.</li>
         </ol>
@@ -685,20 +685,14 @@ function generate() {
     const silA = keep(silicone.trimByPlane([0, 0, -1], -zp));
     const silB = keep(silicone.trimByPlane([0, 0, 1], zp));
 
-    // 7) Llaves de registro (Ø5) y 4 agujeros para tornillos/prensas (M3) en la brida
+    // 7) Llaves de registro (Ø5) en la brida. La brida se cierra con pinzas sujetadocumentos, sin tornillos.
     const mid = keep(cut.offset(FW / 2, 'Round', 2, 64)).toPolygons();
     const keyPts = [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([dx, dy]) => extremePoint(mid, dx, dy)).filter(Boolean);
-    const screwPts = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => extremePoint(mid, dx, dy))
-      .filter(pt => pt && keyPts.every(k => Math.hypot(k[0] - pt[0], k[1] - pt[1]) > 9));
     if (p.keys) for (const [x, y] of keyPts) {
       A = keep(A.add(keep(cylZ(2.5, zp - 0.5, zp + 2.5, x, y, 32))));
       B = keep(B.subtract(keep(cylZ(2.5 + p.clear, zp - 0.5, zp + FT + 0.5, x, y, 32))));
     }
-    for (const [x, y] of screwPts) {
-      const h = keep(cylZ(1.7 + p.clear / 2, zp - FT - 1, zp + FT + 1, x, y, 24));
-      A = keep(A.subtract(h)); B = keep(B.subtract(h));
-    }
-    out.screws = screwPts.length; out.keys = p.keys ? keyPts.length : 0;
+    out.keys = p.keys ? keyPts.length : 0;
 
     // 8) Reservorio / embudo: tapón que cuelga el master + asiento plano sobre Shell B
     const rr = p.funnel / 2;
@@ -979,7 +973,7 @@ $('genBtn').addEventListener('click', async () => {
   }
   result = r;
   showResult(); refreshExport();
-  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Partición a ${fmt(r.stats.zp - layout(params()).mMin.z, 1)} mm de la base del master. ${r.keys} llaves y ${r.screws} agujeros para tornillos en la brida.`));
+  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Partición a ${fmt(r.stats.zp - layout(params()).mMin.z, 1)} mm de la base del master. ${r.keys} llaves de registro. Cierra la brida (6 mm de grueso) con pinzas sujetadocumentos de 25 mm o más.`));
   if (r.method === 'escala') msgs.append(note('warn', '<b>Se usó el método de respaldo:</b> el offset por normales falló, la silicona se calculó escalando el modelo desde su centroide y suavizando. El grosor no es uniforme; revisa la vista previa.'));
   for (const w of r.warnings) msgs.append(note('warn', w));
 });
