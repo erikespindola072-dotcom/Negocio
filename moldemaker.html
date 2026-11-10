@@ -708,7 +708,15 @@ function generate() {
     const boss = keep(keep(cylZ(rr + p.clear + 3, zp + FT, seat, L.wx, L.wy, 64)).subtract(outer));
     B = keep(B.add(boss));
     B = keep(B.subtract(keep(cylZ(rr + p.clear, mTop, seat + 1, L.wx, L.wy, 64))));
-    let plug = keep(cylZ(rr, mTop - 1.5, seat + 2.2, L.wx, L.wy, 64));
+    // Base del tapón: baja hasta el punto más bajo del master bajo su borde y luego se recorta con la forma del master,
+    // así encaja como una tapa sobre superficies curvas sin dejar huecos para la silicona.
+    let lowest = mTop;
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2, z = masterTopAt(L.wx + Math.cos(a) * rr, L.wy + Math.sin(a) * rr);
+      lowest = Math.min(lowest, z ?? mTop - rr);
+    }
+    const plugBottom = Math.max(lowest - 1, mTop - 1.5 * rr - 1.5);
+    let plug = keep(cylZ(rr, plugBottom, seat + 2.2, L.wx, L.wy, 64));
     plug = keep(plug.add(keep(cylZ(rr + 8, seat + 0.2, seat + 2.2, L.wx, L.wy, 64))));
     plug = keep(plug.subtract(master));
 
