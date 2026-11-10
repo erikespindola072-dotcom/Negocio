@@ -86,7 +86,7 @@ label.check:has(input:checked){border-color:var(--ok)}
   <header class="flex flex-wrap items-end justify-between gap-3 mb-4">
     <div>
       <h1 class="text-3xl font-extrabold leading-tight">Molde<span style="color:var(--accent)">Maker</span></h1>
-      <p class="hint" style="font-size:14px">Contramolde rígido en PETG para colar silicona platino sobre tu master impreso y luego verter velas.</p>
+      <p class="hint" style="font-size:14px">Contramolde conforme en PETG que sigue la forma de tu master, para colar silicona platino sobre tu master impreso y luego verter velas.</p>
     </div>
     <div class="flex gap-2 flex-wrap items-center">
       <span id="engineState" class="hint mono">Cargando motor de booleanas…</span>
@@ -104,6 +104,11 @@ label.check:has(input:checked){border-color:var(--ok)}
           <div class="hint">Binario o ASCII · unidades en mm</div>
           <input id="fileInput" type="file" accept=".stl,model/stl" class="sr-only">
         </label>
+        <div class="flex flex-col gap-2"><span class="hint">O prueba un ejemplo:</span>
+          <div class="seg" id="samples">
+            <button type="button" data-sample="star" aria-pressed="false">Vela estrella</button>
+            <button type="button" data-sample="sphere" aria-pressed="false">Esfera Ø30 mm</button>
+          </div></div>
         <div class="stats" id="fileStats">
           <div class="stat" style="grid-column:1/-1"><small>Archivo</small><b id="stName" style="font-family:var(--f-body);word-break:break-all">—</b></div>
           <div class="stat"><small>Triángulos</small><b id="stTris">—</b></div>
@@ -155,16 +160,17 @@ label.check:has(input:checked){border-color:var(--ok)}
 
       <section class="panel flex flex-col gap-4" aria-labelledby="h-dim">
         <div class="step">Paso 3</div>
-        <h2 id="h-dim" class="text-lg font-bold">Medidas del contramolde</h2>
+        <h2 id="h-dim" class="text-lg font-bold">Molde conforme</h2>
+        <p class="hint">La silicona y el shell siguen la forma del master con grosor uniforme. Solo la brida de la partición es plana.</p>
         <div class="range-row"><label class="label" for="wall">Grosor de pared</label><output id="wallOut" for="wall"></output>
           <input id="wall" type="range" min="2" max="4" step="0.1" value="2.5"></div>
-        <div class="range-row"><label class="label" for="gap">Espacio para silicona</label><output id="gapOut" for="gap"></output>
-          <input id="gap" type="range" min="8" max="12" step="0.5" value="10"></div>
+        <div class="range-row"><label class="label" for="gap">Grosor de silicona</label><output id="gapOut" for="gap"></output>
+          <input id="gap" type="range" min="6" max="12" step="0.5" value="8"></div>
         <div class="range-row"><label class="label" for="clear">Holgura FDM</label><output id="clearOut" for="clear"></output>
           <input id="clear" type="range" min="0.1" max="0.8" step="0.05" value="0.4"></div>
         <div class="range-row"><label class="label" for="part">Altura línea de partición</label><output id="partOut" for="part"></output>
           <input id="part" type="range" min="0" max="100" step="0.5" value="50"></div>
-        <label class="switch" for="keys"><span class="label">Llaves de registro (4 × Ø5 mm)</span><input id="keys" type="checkbox" checked></label>
+        <label class="switch" for="keys"><span><span class="label">Llaves de registro (4 × Ø5 mm)</span><br><span class="hint">En la brida de 12 mm, junto a 4 agujeros M3 para prensas</span></span><input id="keys" type="checkbox" checked></label>
       </section>
 
       <section class="panel flex flex-col gap-4" aria-labelledby="h-wick">
@@ -190,6 +196,7 @@ label.check:has(input:checked){border-color:var(--ok)}
       <div class="viewer" id="viewer">
         <div class="legend" aria-hidden="true">
           <span><i class="dot" style="background:#e3a23c"></i>Master</span>
+          <span><i class="dot" style="background:#e58fb0"></i>Silicona</span>
           <span><i class="dot" style="background:#4aa39c"></i>Shell A</span>
           <span><i class="dot" style="background:#6f86c9"></i>Shell B</span>
           <span><i class="dot" style="background:#d6402f"></i>Mecha</span>
@@ -201,15 +208,22 @@ label.check:has(input:checked){border-color:var(--ok)}
           <input id="explode" type="range" min="0" max="80" step="1" value="0"></div>
         <div class="flex flex-wrap gap-4">
           <label class="switch" for="showMaster" style="min-height:32px"><span class="label">Mostrar master</span><input id="showMaster" type="checkbox" checked></label>
+          <label class="switch" for="showSil" style="min-height:32px"><span class="label">Mostrar silicona</span><input id="showSil" type="checkbox" checked></label>
           <label class="switch" for="showShell" style="min-height:32px"><span class="label">Mostrar shell</span><input id="showShell" type="checkbox" checked></label>
           <label class="switch" for="solidShell" style="min-height:32px"><span class="label">Shell opaco</span><input id="solidShell" type="checkbox"></label>
         </div>
+        <h3 class="font-bold" style="font-size:16px">Calculadora de silicona</h3>
         <div class="stats" id="resultStats">
-          <div class="stat"><small>Shell exterior</small><b id="rsOuter">—</b></div>
-          <div class="stat"><small>Silicona aprox.</small><b id="rsSil">—</b></div>
+          <div class="stat" style="border-color:var(--sil)"><small>Silicona estimada</small><b id="rsSil">—</b></div>
+          <div class="stat"><small>Peso estimado de silicona</small><b id="rsSilW">—</b></div>
+          <div class="stat"><small>Con caja rectangular</small><b id="rsBox">—</b></div>
+          <div class="stat"><small>Ahorro</small><b id="rsSave">—</b></div>
+          <div class="stat"><small>Shell con brida</small><b id="rsOuter">—</b></div>
+          <div class="stat"><small>Shell A+B aprox.</small><b id="rsShell">—</b></div>
           <div class="stat"><small>Cera aprox.</small><b id="rsWax">—</b></div>
           <div class="stat"><small>Escala master</small><b id="rsScale">—</b></div>
         </div>
+        <p class="hint">Silicona = volumen OUTER − volumen del master. Densidad 1,1 g/ml. La caja es la del método anterior con el mismo grosor por lado. <span id="rsMethod"></span></p>
       </div>
     </div>
 
@@ -241,8 +255,8 @@ label.check:has(input:checked){border-color:var(--ok)}
         <h2 id="h-how" class="text-lg font-bold">Cómo hacer la vela</h2>
         <ol class="steps">
           <li>Imprime Shell A y Shell B en PETG (3–4 perímetros, 20 % relleno).</li>
-          <li>Pega el tapón reservorio al master, colócalo dentro y cierra A + B con las llaves.</li>
-          <li>Vierte silicona platino por el orificio de colada hasta que salga por el respiradero. Cura 24 h.</li>
+          <li>Pega el tapón reservorio al master, colócalo dentro y cierra A + B con las llaves y 4 tornillos M3 (o prensas) en la brida.</li>
+          <li>Vierte silicona platino por el orificio de colada Ø10 hasta que salga por el respiradero. Usa la cantidad de la calculadora + 10 %. Cura 24 h.</li>
           <li>Abre el shell, corta la silicona en zigzag por un lado, saca el master y vuelve a meter el molde de silicona en el shell.</li>
           <li>Pasa la mecha por el canal de Ø3 mm y céntrala arriba.</li>
           <li>Vierte la cera a 80 °C por el reservorio.</li>
@@ -259,6 +273,7 @@ label.check:has(input:checked){border-color:var(--ok)}
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
   "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+  "three-mesh-bvh":"https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/build/index.module.js",
   "manifold-3d":"https://cdn.jsdelivr.net/npm/manifold-3d@3.0.1/manifold.js"
 }}
 </script>
@@ -269,6 +284,7 @@ import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import ManifoldModule from 'manifold-3d';
+import { MeshBVH } from 'three-mesh-bvh';
 
 const $ = (id) => document.getElementById(id);
 
@@ -319,8 +335,8 @@ grid.rotation.x = Math.PI / 2; grid.material.transparent = true; grid.material.o
 const matMaster = new THREE.MeshStandardMaterial({ color: 0xe3a23c, roughness: 0.55, metalness: 0.05 });
 const matA = new THREE.MeshStandardMaterial({ color: 0x4aa39c, roughness: 0.4, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
 const matB = new THREE.MeshStandardMaterial({ color: 0x6f86c9, roughness: 0.4, transparent: true, opacity: 0.38, depthWrite: false, side: THREE.DoubleSide });
-const matGhost = new THREE.LineBasicMaterial({ color: 0x4aa39c, transparent: true, opacity: 0.8 });
 const matWick = new THREE.LineBasicMaterial({ color: 0xd6402f });
+const matSil = new THREE.MeshStandardMaterial({ color: 0xe58fb0, roughness: 0.7, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide });
 const matPlane = new THREE.MeshBasicMaterial({ color: 0xd9822b, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
 
 const groups = { master: new THREE.Group(), preview: new THREE.Group(), A: new THREE.Group(), B: new THREE.Group() };
@@ -410,7 +426,8 @@ function loadBuffer(buf, name, isSample = false) {
   $('stWater').textContent = an.watertight ? 'Sí' : 'No';
   $('stWater').style.color = an.watertight ? 'var(--ok)' : 'var(--bad)';
   const msgs = $('fileMsgs'); msgs.innerHTML = '';
-  if (isSample) msgs.append(note('ok', 'Modelo de <b>ejemplo</b> (vela estrella torcida). Sube tu STL para reemplazarlo.'));
+  if (isSample) msgs.append(note('ok', 'Modelo de <b>ejemplo</b>. Sube tu STL para reemplazarlo.'));
+  if (!isSample) document.querySelectorAll('#samples button').forEach(b => b.setAttribute('aria-pressed', 'false'));
   if (tris > 250000) msgs.append(note('warn', `<b>Modelo pesado:</b> ${tris.toLocaleString('es')} triángulos. Las booleanas pueden tardar o congelar el navegador. Reduce la malla (Decimate) a menos de 250 000.`));
   if (!an.watertight) msgs.append(note('bad', `<b>El STL no es hermético:</b> ${an.open} bordes abiertos, ${an.nonManifold} bordes no-manifold. Repáralo en tu slicer (PrusaSlicer → Reparar con Netfabb) o Meshmixer antes de generar.`));
   if (Math.min(size.x, size.y, size.z) < 3) msgs.append(note('warn', 'El modelo es casi plano. MoldeMaker está pensado para figuras 3D.'));
@@ -441,29 +458,20 @@ function params() {
   const scale = sil.scale * (candle ? WAX[state.wax].scale : 1);
   return {
     candle, scale,
-    wall: +$('wall').value, gap: +$('gap').value, clear: +$('clear').value,
+    wall: +$('wall').value, sil: +$('gap').value, clear: +$('clear').value,
     partH: +$('part').value, keys: $('keys').checked, wick: $('wick').checked,
     wx: +$('wickX').value, wy: +$('wickY').value,
     funnel: candle ? +$('funnel').value : 12,
   };
 }
-// Caja del master escalado (escala sobre el origen)
+// Caja del master escalado (escala sobre el origen) — solo para medidas y comparación
 function layout(p) {
   const b = model.bbox, s = p.scale;
   const mMin = b.min.clone().multiplyScalar(s), mMax = b.max.clone().multiplyScalar(s);
-  const inMin = mMin.clone().subScalar(p.gap), inMax = mMax.clone().addScalar(p.gap);
-  const outMin = inMin.clone().subScalar(p.wall), outMax = inMax.clone().addScalar(p.wall);
-  const zp = mMin.z + p.partH * s;
-  return { mMin, mMax, inMin, inMax, outMin, outMax, zp, wx: p.wx * s, wy: p.wy * s };
+  return { mMin, mMax, zp: mMin.z + p.partH * s, wx: p.wx * s, wy: p.wy * s };
 }
 
 /* ---------- Vista previa antes de generar ---------- */
-function boxEdges(min, max, mat) {
-  const g = new THREE.BoxGeometry(max.x - min.x, max.y - min.y, max.z - min.z);
-  const e = new THREE.LineSegments(new THREE.EdgesGeometry(g), mat);
-  e.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
-  g.dispose(); return e;
-}
 function showMaster() {
   clearGroup(groups.master);
   if (!model) return;
@@ -479,37 +487,185 @@ function updatePreview() {
   clearGroup(groups.preview);
   if (!model) return;
   const p = params(), L = layout(p);
-  const showGhost = !result;
-  if (showGhost) {
-    groups.preview.add(boxEdges(L.outMin, L.outMax, matGhost));
-    groups.preview.add(boxEdges(L.inMin, L.inMax, new THREE.LineDashedMaterial({ color: 0x4aa39c, dashSize: 3, gapSize: 2, transparent: true, opacity: 0.5 })));
-    groups.preview.children.at(-1).computeLineDistances();
-    const pw = L.outMax.x - L.outMin.x + 30, ph = L.outMax.y - L.outMin.y + 30;
+  const size = L.mMax.clone().sub(L.mMin);
+  if (!result) {
+    const pw = size.x + 2 * (p.sil + p.wall + 14), ph = size.y + 2 * (p.sil + p.wall + 14);
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), matPlane);
-    plane.position.set((L.outMin.x + L.outMax.x) / 2, (L.outMin.y + L.outMax.y) / 2, L.zp);
+    plane.position.set((L.mMin.x + L.mMax.x) / 2, (L.mMin.y + L.mMax.y) / 2, L.zp);
     groups.preview.add(plane);
   }
   if (p.wick) {
-    const e = +$('explode').value;
-    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(L.wx, L.wy, L.outMin.z - 10 - e / 2), new THREE.Vector3(L.wx, L.wy, L.outMax.z + 25 + e / 2)]);
+    const e = +$('explode').value, ext = p.sil + p.wall;
+    const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(L.wx, L.wy, L.mMin.z - ext - 10 - e / 2), new THREE.Vector3(L.wx, L.wy, L.mMax.z + ext + 25 + e / 2)]);
     groups.preview.add(new THREE.Line(g, matWick));
   }
 }
 
-/* ---------- Generación del molde (manifold-3d) ---------- */
-function boxM(min, max) {
-  return M.Manifold.cube([max.x - min.x, max.y - min.y, max.z - min.z]).translate([min.x, min.y, min.z]);
+/* ---------- Offset conforme (malla exterior siguiendo la forma) ---------- */
+function meshArrays(man) {
+  const m = man.getMesh(), np = m.numProp, nv = m.vertProperties.length / np;
+  const pos = new Float64Array(nv * 3);
+  for (let i = 0; i < nv; i++) { pos[i*3] = m.vertProperties[i*np]; pos[i*3+1] = m.vertProperties[i*np+1]; pos[i*3+2] = m.vertProperties[i*np+2]; }
+  return { pos, idx: new Uint32Array(m.triVerts) };
 }
+function arraysToManifold(pos, idx) {
+  const mesh = new M.Mesh({ numProp: 3, vertProperties: new Float32Array(pos), triVerts: idx });
+  mesh.merge();
+  return new M.Manifold(mesh);
+}
+function faceNormals(pos, idx) {
+  const nf = idx.length / 3, fn = new Float64Array(nf * 3), fa = new Float64Array(nf);
+  for (let f = 0; f < nf; f++) {
+    const a = idx[f*3]*3, b = idx[f*3+1]*3, c = idx[f*3+2]*3;
+    const ux = pos[b]-pos[a], uy = pos[b+1]-pos[a+1], uz = pos[b+2]-pos[a+2];
+    const vx = pos[c]-pos[a], vy = pos[c+1]-pos[a+1], vz = pos[c+2]-pos[a+2];
+    let nx = uy*vz-uz*vy, ny = uz*vx-ux*vz, nz = ux*vy-uy*vx;
+    const l = Math.hypot(nx, ny, nz) || 1e-12;
+    fn[f*3] = nx/l; fn[f*3+1] = ny/l; fn[f*3+2] = nz/l; fa[f] = l / 2;
+  }
+  return { fn, fa };
+}
+// Normales promediadas por área + factor de esquina (para que cada cara adyacente se aleje ~d)
+function vertexNormals(pos, idx, maxFactor) {
+  const nv = pos.length / 3, { fn, fa } = faceNormals(pos, idx);
+  const vn = new Float64Array(nv * 3), minDot = new Float64Array(nv).fill(1);
+  for (let f = 0; f < idx.length / 3; f++) for (let k = 0; k < 3; k++) {
+    const v = idx[f*3+k]*3;
+    vn[v] += fn[f*3]*fa[f]; vn[v+1] += fn[f*3+1]*fa[f]; vn[v+2] += fn[f*3+2]*fa[f];
+  }
+  for (let v = 0; v < nv; v++) { const l = Math.hypot(vn[v*3], vn[v*3+1], vn[v*3+2]) || 1; vn[v*3] /= l; vn[v*3+1] /= l; vn[v*3+2] /= l; }
+  for (let f = 0; f < idx.length / 3; f++) for (let k = 0; k < 3; k++) {
+    const v = idx[f*3+k];
+    const d = vn[v*3]*fn[f*3] + vn[v*3+1]*fn[f*3+1] + vn[v*3+2]*fn[f*3+2];
+    if (d < minDot[v]) minDot[v] = d;
+  }
+  const fac = new Float64Array(nv);
+  for (let v = 0; v < nv; v++) fac[v] = Math.min(maxFactor, 1 / Math.max(minDot[v], 1 / maxFactor));
+  return { vn, fac, fn };
+}
+function neighborLists(idx, nv) {
+  const sets = Array.from({ length: nv }, () => new Set());
+  for (let f = 0; f < idx.length / 3; f++) {
+    const a = idx[f*3], b = idx[f*3+1], c = idx[f*3+2];
+    sets[a].add(b); sets[a].add(c); sets[b].add(a); sets[b].add(c); sets[c].add(a); sets[c].add(b);
+  }
+  return sets.map(s => Uint32Array.from(s));
+}
+// Suavizado Taubin (no encoge el volumen como Laplace puro)
+function taubin(pos, nbr, iters) {
+  const nv = pos.length / 3, tmp = new Float64Array(pos.length);
+  for (let it = 0; it < iters * 2; it++) {
+    const lam = it % 2 ? -0.53 : 0.5;
+    for (let v = 0; v < nv; v++) {
+      const N = nbr[v]; if (!N.length) { tmp[v*3] = pos[v*3]; tmp[v*3+1] = pos[v*3+1]; tmp[v*3+2] = pos[v*3+2]; continue; }
+      let x = 0, y = 0, z = 0;
+      for (const u of N) { x += pos[u*3]; y += pos[u*3+1]; z += pos[u*3+2]; }
+      x /= N.length; y /= N.length; z /= N.length;
+      tmp[v*3] = pos[v*3] + lam * (x - pos[v*3]); tmp[v*3+1] = pos[v*3+1] + lam * (y - pos[v*3+1]); tmp[v*3+2] = pos[v*3+2] + lam * (z - pos[v*3+2]);
+    }
+    pos.set(tmp);
+  }
+}
+function flippedFraction(pos0, pos1, idx) {
+  const a = faceNormals(pos0, idx).fn, b = faceNormals(pos1, idx).fn;
+  let bad = 0; const nf = idx.length / 3;
+  for (let f = 0; f < nf; f++) if (a[f*3]*b[f*3] + a[f*3+1]*b[f*3+1] + a[f*3+2]*b[f*3+2] < 0) bad++;
+  return bad / nf;
+}
+// Comprueba que la malla exterior es válida y envuelve por completo a la interior
+function validOuter(man, inner, innerVol) {
+  if (man.isEmpty()) return false;
+  const v = man.volume();
+  if (!(v > innerVol * 1.01)) return false;
+  const leak = inner.subtract(man); const lv = leak.volume(); leak.delete();
+  return lv < innerVol * 0.002;
+}
+/**
+ * Malla exterior = cada vértice desplazado por su normal promediada una distancia `dist`.
+ * 1º intento: un solo paso. 2º: pasos de ~1 mm con suavizado (resuelve concavidades).
+ * Respaldo: escalar desde el centroide hasta un hueco medio = dist y suavizar.
+ */
+function offsetSurface(base, inner, dist, sdf) {
+  const { pos: p0, idx } = meshArrays(base);
+  const nv = p0.length / 3, innerVol = inner.volume();
+  const tries = [
+    { method: 'normal', steps: 1, smooth: 0, maxF: 2 },
+    { method: 'pasos', steps: Math.max(2, Math.ceil(dist / 1)), smooth: 1, maxF: 1.4 },
+  ];
+  let nbr = null;
+  for (const t of tries) {
+    const pos = Float64Array.from(p0), step = dist / t.steps;
+    if (t.smooth && !nbr) nbr = neighborLists(idx, nv);
+    for (let s = 0; s < t.steps; s++) {
+      const { vn, fac } = vertexNormals(pos, idx, t.maxF);
+      for (let v = 0; v < nv; v++) { const d = step * fac[v]; pos[v*3] += vn[v*3]*d; pos[v*3+1] += vn[v*3+1]*d; pos[v*3+2] += vn[v*3+2]*d; }
+      if (t.smooth) taubin(pos, nbr, t.smooth);
+    }
+    if (flippedFraction(p0, pos, idx) > 0.001) continue;
+    let man; try { man = arraysToManifold(pos, idx); } catch { continue; }
+    if (validOuter(man, inner, innerVol)) return { man, method: t.method };
+    man.delete();
+  }
+  // Zonas cóncavas que se pliegan: offset exacto por campo de distancia (mismo grosor uniforme)
+  if (sdf) { try { const man = sdf(); if (validOuter(man, inner, innerVol)) return { man, method: 'distancia' }; man.delete(); } catch (e) { console.warn(e); } }
+  // Respaldo: escalado desde el centroide + suavizado
+  if (!nbr) nbr = neighborLists(idx, nv);
+  const c = [0, 0, 0];
+  for (let v = 0; v < nv; v++) { c[0] += p0[v*3]; c[1] += p0[v*3+1]; c[2] += p0[v*3+2]; }
+  c[0] /= nv; c[1] /= nv; c[2] /= nv;
+  const { vn } = vertexNormals(p0, idx, 1);
+  let proj = 0;
+  for (let v = 0; v < nv; v++) proj += Math.abs((p0[v*3]-c[0])*vn[v*3] + (p0[v*3+1]-c[1])*vn[v*3+1] + (p0[v*3+2]-c[2])*vn[v*3+2]);
+  proj = Math.max(proj / nv, 1);
+  let s = 1 + dist / proj;
+  for (let k = 0; k < 8; k++, s += dist / proj * 0.25) {
+    const pos = new Float64Array(p0.length);
+    for (let v = 0; v < nv; v++) for (let a = 0; a < 3; a++) pos[v*3+a] = c[a] + (p0[v*3+a] - c[a]) * s;
+    taubin(pos, nbr, 3);
+    let man; try { man = arraysToManifold(pos, idx); } catch { continue; }
+    if (validOuter(man, inner, innerVol)) return { man, method: 'escala' };
+    man.delete();
+  }
+  throw new Error('No se pudo crear la superficie exterior conforme (ni por normales ni por escalado). Revisa que el STL sea un sólido cerrado.');
+}
+
+/* Offset exacto: superficie a distancia `level` del master (Manifold.levelSet + BVH) */
+function makeDistanceField(master, diag) {
+  const { pos, idx } = meshArrays(master);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  const bvh = new MeshBVH(g), v = new THREE.Vector3(), tgt = {};
+  const e = Math.min(2.5, Math.max(0.8, diag / 70));
+  return (level) => {
+    const maxT = level + 3 * e;
+    const f = (p) => { const r = bvh.closestPointToPoint(v.set(p[0], p[1], p[2]), tgt, 0, maxT); return r ? level - r.distance : level - maxT; };
+    const bb = master.boundingBox(), pad = level + 2 * e;
+    const band = M.Manifold.levelSet(f, { min: bb.min.map(x => x - pad), max: bb.max.map(x => x + pad) }, e, 0);
+    const out = band.add(master); band.delete();
+    return out;
+  };
+}
+
+/* ---------- Generación del molde conforme (manifold-3d) ---------- */
 function cylZ(r, z0, z1, x, y, seg = 48) {
   return M.Manifold.cylinder(z1 - z0, r, r, seg).translate([x, y, z0]);
 }
-// Altura del master en (x,y): rayo vertical desde arriba
-function masterTopAt(x, y, s) {
+// Altura del master en (x,y): rayo vertical desde arriba (null si no hay master debajo)
+function masterTopAt(x, y) {
   const ray = new THREE.Raycaster(new THREE.Vector3(x, y, 1e4), new THREE.Vector3(0, 0, -1));
   const m = groups.master.children.find(c => c.name === 'master');
   m.updateMatrixWorld(true);
   const hit = ray.intersectObject(m, false)[0];
-  return hit ? hit.point.z : model.bbox.max.z * s;
+  return hit ? hit.point.z : null;
+}
+function extremePoint(polys, dx, dy) {
+  let best = null, bd = -Infinity;
+  for (const poly of polys) for (const pt of poly) {
+    const x = pt[0] ?? pt.x, y = pt[1] ?? pt.y, d = x * dx + y * dy;
+    if (d > bd) { bd = d; best = [x, y]; }
+  }
+  return best;
 }
 
 function generate() {
@@ -518,81 +674,98 @@ function generate() {
   const out = { warnings: [] };
   try {
     // 1) Master escalado como sólido manifold
-    let master = keep(mergedToManifold(model.merged)).scale([p.scale, p.scale, p.scale]); keep(master);
+    const master = keep(keep(mergedToManifold(model.merged)).scale([p.scale, p.scale, p.scale]));
     if (master.isEmpty() || master.volume() <= 0) throw new Error('El master no forma un sólido cerrado.');
-    // master con holgura (escala por eje para crecer ~clearance en cada cara)
-    const sz = L.mMax.clone().sub(L.mMin);
-    const cs = [(sz.x + 2 * p.clear) / sz.x, (sz.y + 2 * p.clear) / sz.y, (sz.z + 2 * p.clear) / sz.z];
-    const masterClear = keep(master.scale(cs));
+    const vMaster = master.volume();
+    // malla densa para que el offset siga bien la forma
+    const sz = L.mMax.clone().sub(L.mMin), diag = sz.length();
+    const base = model.tris < 60000 ? keep(master.refineToLength(Math.max(p.sil * 0.6, diag / 120))) : master;
 
-    // 2) Shell = caja exterior − caja interior (hueco para silicona)
-    const outer = keep(boxM(L.outMin, L.outMax));
-    const inner = keep(boxM(L.inMin, L.inMax));
-    let shell = keep(outer.subtract(inner));
+    // 2) OUTER = superficie exterior de la silicona (offset por normales)
+    const field = makeDistanceField(master, diag + 2 * (p.sil + p.wall));
+    const o1 = offsetSurface(base, master, p.sil, () => field(p.sil)); const outer = keep(o1.man);
+    // 3) Silicona = OUTER − master (grosor uniforme)
+    const silicone = keep(outer.subtract(master));
+    // 4) Shell rígido = offset de OUTER + pared PETG
+    const o2 = o1.method === 'distancia'
+      ? { man: field(p.sil + p.wall), method: 'distancia' }
+      : offsetSurface(outer, outer, p.wall, () => field(p.sil + p.wall));
+    const shellOuter = keep(o2.man);
+    let shell = keep(shellOuter.subtract(outer));
+    out.method = ['escala', 'distancia', 'pasos', 'normal'].find(m => o1.method === m || o2.method === m);
 
-    // 3) Brida en la línea de partición (aloja las llaves)
-    const F = 12, FL = 5;
-    const fMin = new THREE.Vector3(L.outMin.x - F, L.outMin.y - F, L.zp - FL);
-    const fMax = new THREE.Vector3(L.outMax.x + F, L.outMax.y + F, L.zp + FL);
-    const flange = keep(keep(boxM(fMin, fMax)).subtract(inner));
-    shell = keep(shell.add(flange));
+    // 5) Brida plana en la línea de partición: 12 mm de ancho, 3 mm por mitad
+    const zp = L.zp, FW = 12, FT = 3;
+    const cut = keep(shellOuter.slice(zp));
+    if (cut.isEmpty()) throw new Error('La línea de partición no corta el modelo. Muévela dentro de su altura.');
+    const ring = keep(cut.offset(FW, 'Round', 2, 64));
+    const flangeA = keep(keep(keep(M.Manifold.extrude(ring, FT)).translate([0, 0, zp - FT])).subtract(outer));
+    const flangeB = keep(keep(keep(M.Manifold.extrude(ring, FT)).translate([0, 0, zp])).subtract(outer));
 
-    // 4) Restar master con holgura (cavidad)
-    shell = keep(shell.subtract(masterClear));
+    // 6) Dividir silicona y shell en A (abajo) y B (arriba)
+    let A = keep(keep(shell.trimByPlane([0, 0, -1], -zp)).add(flangeA));
+    let B = keep(keep(shell.trimByPlane([0, 0, 1], zp)).add(flangeB));
+    const silA = keep(silicone.trimByPlane([0, 0, -1], -zp));
+    const silB = keep(silicone.trimByPlane([0, 0, 1], zp));
 
-    // 5) Dividir en Shell A (abajo) y Shell B (arriba)
-    let A = keep(shell.trimByPlane([0, 0, -1], -L.zp));
-    let B = keep(shell.trimByPlane([0, 0, 1], L.zp));
-
-    // 6) Llaves de registro: macho en A, hembra en B
-    if (p.keys) {
-      const kx = L.outMax.x + F / 2, ky = L.outMax.y + F / 2, kx0 = L.outMin.x - F / 2, ky0 = L.outMin.y - F / 2;
-      const pts = [[kx, ky], [kx0, ky], [kx, ky0], [kx0, ky0]];
-      for (const [x, y] of pts) {
-        A = keep(A.add(keep(cylZ(2.5, L.zp - 0.5, L.zp + 4, x, y, 32))));
-        B = keep(B.subtract(keep(cylZ(2.5 + p.clear, L.zp - 1, L.zp + 4 + p.clear, x, y, 32))));
-      }
+    // 7) Llaves de registro (Ø5) y 4 agujeros para tornillos/prensas (M3) en la brida
+    const mid = keep(cut.offset(FW / 2, 'Round', 2, 64)).toPolygons();
+    const keyPts = [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([dx, dy]) => extremePoint(mid, dx, dy)).filter(Boolean);
+    const screwPts = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => extremePoint(mid, dx, dy))
+      .filter(pt => pt && keyPts.every(k => Math.hypot(k[0] - pt[0], k[1] - pt[1]) > 9));
+    if (p.keys) for (const [x, y] of keyPts) {
+      A = keep(A.add(keep(cylZ(2.5, zp - 0.5, zp + 2.5, x, y, 32))));
+      B = keep(B.subtract(keep(cylZ(2.5 + p.clear, zp - 0.5, zp + FT + 0.5, x, y, 32))));
     }
+    for (const [x, y] of screwPts) {
+      const h = keep(cylZ(1.7 + p.clear / 2, zp - FT - 1, zp + FT + 1, x, y, 24));
+      A = keep(A.subtract(h)); B = keep(B.subtract(h));
+    }
+    out.screws = screwPts.length; out.keys = p.keys ? keyPts.length : 0;
 
-    // 7) Reservorio / embudo: tapón que cuelga el master + agujero en la tapa de B
+    // 8) Reservorio / embudo: tapón que cuelga el master + asiento plano sobre Shell B
     const rr = p.funnel / 2;
-    const topZ = masterTopAt(L.wx, L.wy, p.scale);
-    const plugBottom = Math.min(topZ - 1.5, L.inMax.z - 2);
-    let plug = keep(cylZ(rr, plugBottom, L.outMax.z + 6, L.wx, L.wy, 64));
-    plug = keep(plug.add(keep(cylZ(rr + 8, L.outMax.z + 0.2, L.outMax.z + 2.2, L.wx, L.wy, 64))));
-    B = keep(B.subtract(keep(cylZ(rr + p.clear, L.inMax.z - 1, L.outMax.z + 1, L.wx, L.wy, 64))));
-
-    // Orificio de colada de silicona (Ø12) y respiradero (Ø5) en esquinas opuestas de la tapa
-    const ix = L.inMax.x - 7, iy = L.inMax.y - 7, ix0 = L.inMin.x + 5, iy0 = L.inMin.y + 5;
-    B = keep(B.subtract(keep(cylZ(6, L.inMax.z - 1, L.outMax.z + 1, ix, iy))));
-    B = keep(B.subtract(keep(cylZ(2.5, L.inMax.z - 1, L.outMax.z + 1, ix0, iy0))));
-
-    // 8) Canal de mecha Ø3 a través de ambas mitades y del tapón
-    if (p.wick) {
-      const w = keep(cylZ(1.5, L.outMin.z - 5, L.outMax.z + 10, L.wx, L.wy, 24));
-      A = keep(A.subtract(w)); B = keep(B.subtract(w)); plug = keep(plug.subtract(w));
-    }
-    // El tapón no debe invadir el master
+    const topZ = shellOuter.boundingBox().max[2];
+    const mTop = masterTopAt(L.wx, L.wy) ?? L.mMax.z;
+    const seat = topZ + 3;
+    const boss = keep(keep(cylZ(rr + p.clear + 3, zp + FT, seat, L.wx, L.wy, 64)).subtract(outer));
+    B = keep(B.add(boss));
+    B = keep(B.subtract(keep(cylZ(rr + p.clear, mTop, seat + 1, L.wx, L.wy, 64))));
+    let plug = keep(cylZ(rr, mTop - 1.5, seat + 2.2, L.wx, L.wy, 64));
+    plug = keep(plug.add(keep(cylZ(rr + 8, seat + 0.2, seat + 2.2, L.wx, L.wy, 64))));
     plug = keep(plug.subtract(master));
 
-    // 9) Verificar que la cavidad existe
-    const vOuter = outer.volume(), vInner = inner.volume();
-    const vA = A.volume(), vB = B.volume();
-    if (A.isEmpty() || B.isEmpty()) throw new Error('Una de las mitades quedó vacía. Mueve la línea de partición.');
-    const hollow = (vA + vB) < vOuter - 0.8 * vInner; // si fuera bloque sólido, vA+vB ≈ vOuter
-    if (!hollow) throw new Error('El resultado no tiene cavidad. No se exportará un bloque sólido.');
-    // la cavidad debe contener el master con espacio para silicona
-    const masterInShell = master.intersect(keep(A.add(B))); keep(masterInShell);
-    if (masterInShell.volume() > 0.001 * master.volume()) out.warnings.push('El master toca la pared del shell. Aumenta el espacio para silicona.');
+    // Colada de silicona (Ø10) y respiradero (Ø4) a los lados del reservorio
+    const off = rr + p.clear + 3 + 7;
+    for (const [dx, r] of [[off, 5], [-off, 2]]) {
+      const x = L.wx + dx, y = L.wy, z0 = masterTopAt(x, y) ?? zp + FT;
+      B = keep(B.subtract(keep(cylZ(r, z0 + 0.5, seat + 1, x, y, 32))));
+    }
 
-    const vMaster = master.volume();
-    const plugInside = keep(plug.intersect(inner));
-    const vSil = vInner - vMaster - plugInside.volume();
-    out.A = manifoldToGeometry(A);
-    out.B = manifoldToGeometry(B);
+    // 9) Canal de mecha Ø3 a través de ambas mitades y del tapón
+    if (p.wick) {
+      const w = keep(cylZ(1.5, L.mMin.z - p.sil - p.wall - 10, seat + 10, L.wx, L.wy, 24));
+      A = keep(A.subtract(w)); B = keep(B.subtract(w)); plug = keep(plug.subtract(w));
+    }
+
+    // 10) Verificaciones: cavidad real y no un bloque
+    if (A.isEmpty() || B.isEmpty()) throw new Error('Una de las mitades quedó vacía. Mueve la línea de partición.');
+    const vOuter = outer.volume(), vShellOuter = shellOuter.volume();
+    if (!(shell.volume() < vShellOuter - 0.9 * vOuter)) throw new Error('El shell no tiene cavidad. No se exportará un bloque sólido.');
+    const touch = keep(master.intersect(keep(A.add(B))));
+    if (touch.volume() > 0.001 * vMaster) out.warnings.push('El master toca el shell. Aumenta el grosor de silicona.');
+
+    const boxVol = (sz.x + 2 * p.sil) * (sz.y + 2 * p.sil) * (sz.z + 2 * p.sil);
+    out.A = manifoldToGeometry(A); out.B = manifoldToGeometry(B);
+    out.silA = manifoldToGeometry(silA); out.silB = manifoldToGeometry(silB);
     out.plugGeom = manifoldToGeometry(plug);
     out.masterGeom = manifoldToGeometry(master);
-    out.stats = { outer: L.outMax.clone().sub(L.outMin), silMl: vSil / 1000, waxMl: vMaster / 1000, scale: p.scale, zp: L.zp };
+    const bb = new THREE.Box3().setFromBufferAttribute(out.A.getAttribute('position')).union(new THREE.Box3().setFromBufferAttribute(out.B.getAttribute('position')));
+    out.stats = {
+      outer: bb.getSize(new THREE.Vector3()), scale: p.scale, zp,
+      silMl: (vOuter - vMaster) / 1000, boxMl: (boxVol - vMaster) / 1000, waxMl: vMaster / 1000,
+      shellMl: (A.volume() + B.volume()) / 1000,
+    };
     out.ok = true;
   } catch (e) {
     out.ok = false; out.error = (e && e.message) ? e.message : String(e);
@@ -602,18 +775,38 @@ function generate() {
   return out;
 }
 
+const METHOD_TXT = {
+  normal: 'Offset por normales promediadas (grosor uniforme).',
+  pasos: 'Offset por normales en pasos de 1 mm con suavizado (resuelve zonas cóncavas).',
+  distancia: 'Offset exacto por campo de distancia: las zonas cóncavas plegaban el offset por normales (grosor uniforme).',
+  escala: 'Respaldo: escalado desde el centroide y suavizado. El grosor de silicona no es uniforme.',
+};
 function showResult() {
   clearGroup(groups.A); clearGroup(groups.B);
   if (!result?.ok) return;
-  groups.A.add(new THREE.Mesh(result.A, matA));
-  groups.B.add(new THREE.Mesh(result.B, matB));
+  groups.A.add(new THREE.Mesh(result.A, matA), new THREE.Mesh(result.silA, matSil));
+  groups.B.add(new THREE.Mesh(result.B, matB), new THREE.Mesh(result.silB, matSil));
+  groups.A.children[1].name = groups.B.children[1].name = 'silicone';
+  syncVisibility();
   showMaster();
   applyExplode();
   const s = result.stats;
   $('rsOuter').textContent = `${fmt(s.outer.x, 0)}×${fmt(s.outer.y, 0)}×${fmt(s.outer.z, 0)} mm`;
-  $('rsSil').textContent = `${fmt(s.silMl, 0)} ml · ${fmt(s.silMl * 1.08, 0)} g`;
+  $('rsSil').textContent = `${fmt(s.silMl, 1)} ml`;
+  $('rsSilW').textContent = `${fmt(s.silMl * 1.1, 0)} g`;
+  $('rsBox').textContent = `${fmt(s.boxMl, 1)} ml`;
+  const save = s.boxMl > 0 ? (1 - s.silMl / s.boxMl) * 100 : 0;
+  $('rsSave').textContent = `${fmt(save, 0)} %`;
+  $('rsSave').style.color = save > 20 ? 'var(--ok)' : 'var(--warn)';
   $('rsWax').textContent = `${fmt(s.waxMl, 0)} ml · ${fmt(s.waxMl * 0.9, 0)} g`;
   $('rsScale').textContent = '×' + s.scale.toFixed(4);
+  $('rsShell').textContent = `${fmt(s.shellMl * 1.27, 0)} g PETG`;
+  $('rsMethod').textContent = METHOD_TXT[result.method];
+  $('rsMethod').style.color = result.method === 'escala' ? 'var(--warn)' : 'var(--muted)';
+}
+function syncVisibility() {
+  const showSil = $('showSil').checked, showShell = $('showShell').checked;
+  for (const g of [groups.A, groups.B]) for (const c of g.children) c.visible = c.name === 'silicone' ? showSil : showShell;
 }
 function applyExplode() {
   const e = +$('explode').value;
@@ -625,7 +818,7 @@ function applyExplode() {
 /* ---------- Invalidación y exportación ---------- */
 function invalidate() {
   if (result) { result = null; clearGroup(groups.A); clearGroup(groups.B); showMaster(); $('genMsgs').innerHTML = ''; $('genMsgs').append(note('warn', 'Cambiaste un parámetro. Vuelve a <b>Generar Molde</b>.')); }
-  for (const id of ['rsOuter', 'rsSil', 'rsWax']) $(id).textContent = '—';
+  for (const id of ['rsOuter', 'rsSil', 'rsSilW', 'rsBox', 'rsSave', 'rsShell', 'rsWax', 'rsMethod']) $(id).textContent = id === 'rsMethod' ? '' : '—';
   if (model) $('rsScale').textContent = '×' + params().scale.toFixed(4);
   updatePreview(); refreshExport();
 }
@@ -766,7 +959,8 @@ for (const id of ['wall', 'gap', 'clear', 'part', 'wickX', 'wickY', 'funnel']) {
 for (const id of ['keys', 'wick']) $(id).addEventListener('change', invalidate);
 $('explode').addEventListener('input', () => { updateOutputs(); applyExplode(); });
 $('showMaster').addEventListener('change', () => groups.master.visible = $('showMaster').checked);
-$('showShell').addEventListener('change', () => { groups.A.visible = groups.B.visible = $('showShell').checked; });
+$('showShell').addEventListener('change', syncVisibility);
+$('showSil').addEventListener('change', syncVisibility);
 $('solidShell').addEventListener('change', () => {
   const solid = $('solidShell').checked;
   for (const m of [matA, matB]) { m.opacity = solid ? 1 : 0.38; m.transparent = !solid; m.depthWrite = solid; m.needsUpdate = true; }
@@ -824,7 +1018,8 @@ $('genBtn').addEventListener('click', async () => {
   }
   result = r;
   showResult(); refreshExport();
-  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Partición a ${fmt(r.stats.zp + 0 - layout(params()).mMin.z, 1)} mm de la base del master.`));
+  msgs.append(note('ok', `Molde generado en ${fmt((performance.now() - t0) / 1000, 1)} s. Cavidad verificada. Partición a ${fmt(r.stats.zp - layout(params()).mMin.z, 1)} mm de la base del master. ${r.keys} llaves y ${r.screws} agujeros para tornillos en la brida.`));
+  if (r.method === 'escala') msgs.append(note('warn', '<b>Se usó el método de respaldo:</b> el offset por normales falló, la silicona se calculó escalando el modelo desde su centroide y suavizando. El grosor no es uniforme; revisa la vista previa.'));
   for (const w of r.warnings) msgs.append(note('warn', w));
   if ($('candleMode').checked && state.shellMat === 'PLA') msgs.append(note('warn', 'Recuerda: imprime este shell en <b>PETG</b>, no en PLA.'));
 });
@@ -840,16 +1035,22 @@ try {
   $('engineState').style.color = 'var(--bad)';
   $('genMsgs').append(note('bad', '<b>El motor de booleanas no cargó.</b> Recarga la página. Sin él no se puede generar el molde.'));
 }
-// Modelo de ejemplo: vela estrella torcida (creada con manifold y pasada por el lector STL)
-if (M && !model) {
-  const pts = []; const n = 6;
-  for (let i = 0; i < n * 2; i++) { const a = (i / (n * 2)) * Math.PI * 2, r = i % 2 ? 15 : 23; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
-  const body = M.Manifold.extrude([pts], 62, 40, 70, 0.72);
-  const base = M.Manifold.cylinder(5, 24, 24, 64);
-  const star = body.translate([0, 0, 4]).add(base);
-  const g = manifoldToGeometry(star); star.delete(); body.delete(); base.delete();
+// Modelos de ejemplo (creados con manifold y pasados por el lector STL)
+function loadSample(kind) {
+  let man;
+  if (kind === 'sphere') man = M.Manifold.sphere(15, 96);
+  else {
+    const pts = []; const n = 6;
+    for (let i = 0; i < n * 2; i++) { const a = (i / (n * 2)) * Math.PI * 2, r = i % 2 ? 15 : 23; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+    const body = M.Manifold.extrude([pts], 62, 40, 70, 0.72), base = M.Manifold.cylinder(5, 24, 24, 64), moved = body.translate([0, 0, 4]);
+    man = moved.add(base); body.delete(); base.delete(); moved.delete();
+  }
+  const g = manifoldToGeometry(man); man.delete();
   const dv = exporter.parse(new THREE.Mesh(g), { binary: true });
-  loadBuffer(dv.buffer, 'vela_estrella.stl', true);
+  loadBuffer(dv.buffer, kind === 'sphere' ? 'esfera_30mm.stl' : 'vela_estrella.stl', true);
+  document.querySelectorAll('#samples button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sample === kind)));
 }
+$('samples').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && M) loadSample(b.dataset.sample); });
+if (M && !model) loadSample('star');
 $('genBtn').disabled = !M;
 </script>
